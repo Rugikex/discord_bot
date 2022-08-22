@@ -15,13 +15,26 @@ client = discord.Client()
 prefix = 'tk'
 reactions_song = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
 current_music = {}
+"""
+Store by guild id
+Contains a list of MusicItem(s) if users request multiples musics
+"""
 queues_musics = {}
-specifics_researches = {}
+"""
+Store by guild id
+Contains searches if user requests song with search terms
+Each key stores a dict containing:
+    'searches': list of 1 to 5 MusicItem about the last search terms
+    'shuffle': boolean to know if the music must be shuffled
+    'user': user who requested the song
+    'message': message that shows searches
+"""
+specifics_searches = {}
 
 FFMPEG_OPTIONS = {
-        'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 3',
-        'options': '-vn',
-    }
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 3',
+    'options': '-vn',
+}
 
 
 async def next_music(message: discord.Message):
@@ -171,23 +184,32 @@ async def play(message: discord.Message, content: str, shuffle=False):
 
         if content.startswith("https://www.youtube.com/playlist?list=") or \
                 (content.startswith("https://www.youtube.com/watch?v=") and "list=" in content):
-            message = await message.channel.send("Loading playlist...")
+            message_loading = await message.channel.send("Loading playlist...")
             musics = youtube_requests.playlist_link(content)
-            await message.delete()
+            await message_loading.delete()
         elif content.startswith("https://www.youtube.com/watch?v="):
             musics = youtube_requests.single_link(content)
         else:
-            specifics_researches[message.guild.id] = {'researches': youtube_requests.specific_search(content),
-                                                      'shuffle': shuffle}
+            message_loading = await message.channel.send(f"Searching for music related to {content}.")
+            searches = youtube_requests.specific_search(content)
+            await message_loading.delete()
+            if not searches:
+                await message.channel.send(f"No music found for {content}")
+                return
+
+            specifics_searches[message.guild.id] = {'searches': searches,
+                                                    'shuffle': shuffle,
+                                                    'user': message.author}
             msg_content = f'Select a track with reactions or `{prefix}' \
-                          f'1-{len(specifics_researches[message.guild.id]["researches"])}`:\n'
-            for i in range(len(specifics_researches[message.guild.id]['researches'])):
-                msg_content += f'**{i+1}:** {specifics_researches[message.guild.id]["researches"][i]}\n'
+                          f'1-{len(specifics_searches[message.guild.id]["searches"])}`:\n'
+            for i in range(len(specifics_searches[message.guild.id]['searches'])):
+                msg_content += f'**{i + 1}:** {specifics_searches[message.guild.id]["searches"][i]}\n'
             message = await message.channel.send(msg_content)
-            specifics_researches[message.guild.id]['message'] = message
+            specifics_searches[message.guild.id]['message'] = message
             # Can't add multiples reactions at once
-            for i in range(len(specifics_researches[message.guild.id]['researches'])):
+            for i in range(len(specifics_searches[message.guild.id]['searches'])):
                 await message.add_reaction(reactions_song[i])
+            print(specifics_searches[message.guild.id])
             return
 
         if not musics:
@@ -216,12 +238,12 @@ async def play(message: discord.Message, content: str, shuffle=False):
 
 
 async def select_specific_search(message: discord.Message, number):
-    if number < 1 or number > len(specifics_researches[message.guild.id]['researches']):
-        await message.channel.send(f'Choose between 1 and {len(specifics_researches[message.guild.id]["researches"])}')
+    if number < 1 or number > len(specifics_searches[message.guild.id]['searches']):
+        await message.channel.send(f'Choose between 1 and {len(specifics_searches[message.guild.id]["searches"])}')
         return
 
-    music = [specifics_researches[message.guild.id]['researches'][number - 1]]
-    shuffle = specifics_researches[message.guild.id]['shuffle']
+    music = [specifics_searches[message.guild.id]['searches'][number - 1]]
+    shuffle = specifics_searches[message.guild.id]['shuffle']
 
     channel: discord.VoiceChannel = client.get_channel(message.author.voice.channel.id)
     if not await is_connected(message, channel):
@@ -232,8 +254,8 @@ async def select_specific_search(message: discord.Message, number):
         if voice_client.channel != channel:
             continue
 
-        await specifics_researches[message.guild.id]['message'].delete()
-        specifics_researches.pop(message.guild.id, None)
+        await specifics_searches[message.guild.id]['message'].delete()
+        specifics_searches.pop(message.guild.id, None)
 
         if voice_client.guild.id in queues_musics:
             queues_musics[voice_client.guild.id].extend(music)
@@ -300,14 +322,17 @@ async def on_message(message: discord.Message):
         await message.channel.send(f'Need help? Check {prefix}help.')
         return
 
-    if message.guild.id in specifics_researches:
+    if message.guild.id in specifics_searches:
+        if message.author != specifics_searches[message.guild.id]['user']:
+            return
+
         number = 1
         try:
             number = int(content)
         except ValueError:
-            specifics_researches.pop(message.guild.id, None)
+            specifics_searches.pop(message.guild.id, None)
 
-        if message.guild.id in specifics_researches:
+        if message.guild.id in specifics_searches:
             await select_specific_search(message, number)
             return
 
@@ -389,13 +414,18 @@ async def on_reaction_add(reaction, user):
     if user == client.user:
         return
 
-    if user.guild.id not in specifics_researches:
+    if user.guild.id not in specifics_searches:
         return
 
-    if reaction.message != specifics_researches[user.guild.id]['message']:
+    if reaction.message != specifics_searches[user.guild.id]['message']:
         return
 
-    if reaction.emoji not in reactions_song[:len(specifics_researches[user.guild.id]['researches']) + 1]:
+    if user != specifics_searches[user.guild.id]['user']:
+        print(user)
+        print(specifics_searches[user.guild.id]['user'])
+        return
+
+    if reaction.emoji not in reactions_song[:len(specifics_searches[user.guild.id]['searches']) + 1]:
         return
 
     await select_specific_search(reaction.message, reactions_song.index(reaction.emoji) + 1)
