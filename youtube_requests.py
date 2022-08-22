@@ -6,7 +6,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import isodate
 import pytube
-from pytube.exceptions import RegexMatchError
+import pytube.exceptions
 
 from class_music_item import MusicItem
 
@@ -39,15 +39,16 @@ def create_music_items(video_ids):
 def specific_search(context):
     search = pytube.Search(context)
     res = []
-    for i in range(min(5, len(search.results))):
-        res.append(create_music_item(search.results[i]))
+    results = search.results
+    for i in range(min(5, len(results))):
+        res.append(create_music_item(results[i]))
     return res
 
 
 def single_link(link):
     try:
         obj = pytube.YouTube(link)
-    except RegexMatchError:
+    except pytube.exceptions.RegexMatchError:
         return []
 
     return [create_music_item(obj)]

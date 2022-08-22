@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import os
+import re
 import random
 
 import discord
@@ -14,6 +15,12 @@ discord_key = os.getenv("DISCORD_KEY")
 client = discord.Client()
 prefix = 'tk'
 reactions_song = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
+reactions_queue = ["⬆️", "⬇️"]
+"""
+Can be change
+Store by guild id
+Contains the message displaying which music is playing
+"""
 current_music = {}
 """
 Store by guild id
@@ -31,9 +38,14 @@ Each key stores a dict containing:
 """
 specifics_searches = {}
 
+ydl_opts = {
+    'format': 'bestaudio/best',
+    'youtube_include_dash_manifest': False,
+    'quiet': True
+}
 FFMPEG_OPTIONS = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 3',
-    'options': '-vn',
+    'options': '-vn -loglevel quiet',
 }
 
 
@@ -46,7 +58,6 @@ async def next_music(message: discord.Message):
         if queues_musics[guild_id]:
             new_music = queues_musics[guild_id].pop(0)
 
-            ydl_opts = {'format': 'bestaudio'}
             with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(new_music.link, download=False)
                 url = info['formats'][0]['url']
@@ -54,20 +65,24 @@ async def next_music(message: discord.Message):
             audio = discord.FFmpegPCMAudio(url,
                                            before_options=FFMPEG_OPTIONS['before_options'],
                                            options=FFMPEG_OPTIONS['options'])
-            current_music[guild_id] = audio
 
             voice_client.play(audio, after=lambda x=None: asyncio.run_coroutine_threadsafe(next_music(message),
                                                                                            client.loop))
-            await message.channel.send(f'Now playing {new_music}.')
+            if guild_id in current_music:
+                await current_music[guild_id].delete()
+            current_music[guild_id] = await message.channel.send(f'Now playing {new_music}.')
         else:
             queues_musics.pop(guild_id, None)
+            if guild_id in current_music:
+                await current_music[guild_id].delete()
+            current_music.pop(guild_id, None)
 
 
-async def get_queue_total_time(message: discord.Message):
+def get_queue_total_time(message: discord.Message):
     res = datetime.timedelta(0)
     for item in queues_musics[message.guild.id]:
         res += item.duration
-    await message.channel.send(res)
+    return res
 
 
 async def get_voice_client(message: discord.Message):
@@ -172,6 +187,32 @@ async def is_connected(message: discord.Message, channel):
     return True
 
 
+async def get_queue(message: discord.Message, page):
+    voice_client = await check_voice_client(message)
+    if voice_client is None:
+        return
+
+    if message.guild.id not in queues_musics or not queues_musics[message.guild.id]:
+        await message.channel.send("Queue is empty!")
+        return
+
+    if not queues_musics[message.guild.id][(page - 1) * 10:page * 10]:
+        await message.channel.send("Number page is too big!")
+        return
+
+    msg_content = f'Queue list(page {page}):\n'
+    for i in range(len(queues_musics[message.guild.id][(page - 1) * 10:page * 10])):
+        msg_content += f'**{i + 1 + (page - 1) * 10}.** {queues_musics[message.guild.id][i]}\n'
+    msg_content += f'__Total time:__ {get_queue_total_time(message)}'
+
+    message_response = await message.channel.send(msg_content)
+    if page != 1:
+        await message_response.add_reaction(reactions_queue[0])
+
+    if queues_musics[message.guild.id][page * 10:]:
+        await message_response.add_reaction(reactions_queue[1])
+
+
 async def play(message: discord.Message, content: str, shuffle=False):
     channel: discord.VoiceChannel = client.get_channel(message.author.voice.channel.id)
     if not await is_connected(message, channel):
@@ -200,8 +241,8 @@ async def play(message: discord.Message, content: str, shuffle=False):
             specifics_searches[message.guild.id] = {'searches': searches,
                                                     'shuffle': shuffle,
                                                     'user': message.author}
-            msg_content = f'Select a track with reactions or `{prefix}' \
-                          f'1-{len(specifics_searches[message.guild.id]["searches"])}`:\n'
+            msg_content = f'Select a track with reactions or' \
+                          f'`{prefix}1-{len(specifics_searches[message.guild.id]["searches"])}`:\n'
             for i in range(len(specifics_searches[message.guild.id]['searches'])):
                 msg_content += f'**{i + 1}:** {specifics_searches[message.guild.id]["searches"][i]}\n'
             message = await message.channel.send(msg_content)
@@ -209,7 +250,6 @@ async def play(message: discord.Message, content: str, shuffle=False):
             # Can't add multiples reactions at once
             for i in range(len(specifics_searches[message.guild.id]['searches'])):
                 await message.add_reaction(reactions_song[i])
-            print(specifics_searches[message.guild.id])
             return
 
         if not musics:
@@ -284,12 +324,25 @@ async def shuffle_queue(message: discord.Message):
     await message.add_reaction("🔀")
 
 
+async def clear_queue(message: discord.Message):
+    voice_client = await check_voice_client(message)
+    if voice_client is None:
+        return
+
+    if message.guild.id not in queues_musics:
+        return
+
+    queues_musics[voice_client.guild.id] = None
+    await message.add_reaction("💣")
+
+
 async def msg_help(message: discord.Message):
     content = f"`{prefix}help` or `{prefix}h`: Display this message.\n" \
               f"`{prefix}play` or `{prefix}p`: Play music with <youtube url/playlist or search terms>.\n" \
               f"`{prefix}playshuffle` or `{prefix}ps`: Play music and shuffle queue.\n" \
               f"`{prefix}shuffle`: Shuffle queue.\n" \
               f"`{prefix}skip` or `{prefix}s`: Skip current music.\n" \
+              f"`{prefix}clear`: Clear queue.\n" \
               f"`{prefix}stop`: Stop current music.\n" \
               f"`{prefix}resume`: Resume current music.\n" \
               f"`{prefix}quit`: Disconnect the bot.\n"
@@ -318,22 +371,29 @@ async def on_message(message: discord.Message):
         await message.channel.send(f'Need help? Check {prefix}help.')
         return
 
-    if message.guild.id in specifics_searches:
-        if message.author != specifics_searches[message.guild.id]['user']:
-            return
-
-        number = 1
+    if message.guild.id in specifics_searches and message.author == specifics_searches[message.guild.id]['user']:
         try:
             number = int(content)
         except ValueError:
-            specifics_searches.pop(message.guild.id, None)
-
-        if message.guild.id in specifics_searches:
-            await select_specific_search(message, number)
             return
+
+        await select_specific_search(message, number)
+        return
+
+    if content == 'clear':
+        await clear_queue(message)
+        return
 
     if content == 'help' or content == 'h':
         await msg_help(message)
+        return
+
+    if content == 'queue':
+        await get_queue(message, 1)
+        return
+
+    if re.compile("queue [0-9]+").match(content):
+        await get_queue(message, int(re.search("queue ([0-9]+)", content).group(1)))
         return
 
     if content == 'quit':
@@ -406,21 +466,36 @@ async def on_reaction_add(reaction, user):
     if user == client.user:
         return
 
-    if user.guild.id not in specifics_searches:
+    if reaction.message.author == client.user and reaction.message.content.startswith("Queue list(page "):
+        if reaction.emoji not in reactions_queue:
+            return
+
+        page = int(re.search("Queue list\(page (.*)\):", reaction.message.content).group(1))
+        if page == 1 and reaction == reactions_queue[0]:
+            return
+
+        if queues_musics[reaction.message.guild.id][page * 10:] and reaction == reactions_queue[1]:
+            return
+
+        if reaction.emoji == reactions_queue[0]:
+            await reaction.message.delete()
+            await get_queue(reaction.message, page - 1)
+        else:
+            await reaction.message.delete()
+            await get_queue(reaction.message, page + 1)
         return
 
-    if reaction.message != specifics_searches[user.guild.id]['message']:
-        return
+    if user.guild.id in specifics_searches:
+        if reaction.message != specifics_searches[user.guild.id]['message']:
+            return
 
-    if user != specifics_searches[user.guild.id]['user']:
-        print(user)
-        print(specifics_searches[user.guild.id]['user'])
-        return
+        if user != specifics_searches[user.guild.id]['user']:
+            return
 
-    if reaction.emoji not in reactions_song[:len(specifics_searches[user.guild.id]['searches']) + 1]:
-        return
+        if reaction.emoji not in reactions_song[:len(specifics_searches[user.guild.id]['searches']) + 1]:
+            return
 
-    await select_specific_search(reaction.message, reactions_song.index(reaction.emoji) + 1)
+        await select_specific_search(reaction.message, reactions_song.index(reaction.emoji) + 1)
 
 
 def main():
