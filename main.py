@@ -222,7 +222,6 @@ async def select_specific_search(message: discord.Message, number):
 
     music = [specifics_researches[message.guild.id]['researches'][number - 1]]
     shuffle = specifics_researches[message.guild.id]['shuffle']
-    specifics_researches.pop(message.guild.id, None)
 
     channel: discord.VoiceChannel = client.get_channel(message.author.voice.channel.id)
     if not await is_connected(message, channel):
@@ -232,6 +231,9 @@ async def select_specific_search(message: discord.Message, number):
         voice_client: discord.VoiceClient
         if voice_client.channel != channel:
             continue
+
+        await specifics_researches[message.guild.id]['message'].delete()
+        specifics_researches.pop(message.guild.id, None)
 
         if voice_client.guild.id in queues_musics:
             queues_musics[voice_client.guild.id].extend(music)
@@ -397,7 +399,6 @@ async def on_reaction_add(reaction, user):
         return
 
     await select_specific_search(reaction.message, reactions_song.index(reaction.emoji) + 1)
-    await reaction.message.delete()
 
 
 def main():
