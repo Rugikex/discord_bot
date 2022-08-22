@@ -297,10 +297,6 @@ async def msg_help(message: discord.Message):
     await message.channel.send(content)
 
 
-async def test(message: discord.Message):
-    print(current_music[message.guild.id].read())
-
-
 @client.event
 async def on_ready():
     guilds = []
@@ -339,10 +335,6 @@ async def on_message(message: discord.Message):
     if content == 'help' or content == 'h':
         await msg_help(message)
         return
-
-    if content == 'test':
-        channel = message.channel
-        await channel.send('Say hello!')
 
     if content == 'quit':
         await disconnect(message)
