@@ -1,18 +1,12 @@
 import datetime
-import os
 
-from dotenv import load_dotenv
-from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import isodate
 import pytube
 import pytube.exceptions
 
+import globals_var
 from class_music_item import MusicItem
-
-load_dotenv()
-youtube_key = os.getenv("YOUTUBE_KEY")
-youtube = build("youtube", "v3", developerKey=youtube_key)
 
 
 def create_music_item(yt_obj):
@@ -21,7 +15,7 @@ def create_music_item(yt_obj):
 
 def create_music_items(video_ids):
     res = []
-    request = youtube.videos().list(
+    request = globals_var.youtube.videos().list(
         part="snippet,contentDetails,id",
         id=video_ids
     )
@@ -70,7 +64,7 @@ def playlist_link(link):
 # Faster than playlist_link but costs twice in YouTube API units
 def playlist_link2(link):
     playlist_id = link.split("list=", 1)[1].split("&index=", 1)[0]
-    request_id = youtube.playlistItems().list(
+    request_id = globals_var.youtube.playlistItems().list(
         part="contentDetails",
         maxResults=50,
         playlistId=playlist_id
@@ -85,6 +79,7 @@ def playlist_link2(link):
         video_ids = ','.join(map(str, map(lambda n: n['contentDetails']['videoId'], response_id['items'])))
         res.extend(create_music_items(video_ids))
 
-        request_id = youtube.playlistItems().list_next(previous_request=request_id, previous_response=response_id)
+        request_id = globals_var.youtube.playlistItems()\
+            .list_next(previous_request=request_id, previous_response=response_id)
 
     return res
