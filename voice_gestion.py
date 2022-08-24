@@ -217,11 +217,10 @@ async def play(message: discord.Message, content: str, shuffle=False):
         elif content.startswith("https://www.youtube.com/watch?v="):
             musics = youtube_requests.single_link(content)
         else:
-            message_loading = await message.channel.send(f"Searching for music related to {content}.")
+            message_response = await message.channel.send(f"Searching for music related to {content}.")
             searches = youtube_requests.specific_search(content)
-            await message_loading.delete()
             if not searches:
-                await message.channel.send(f"No music found for {content}")
+                await message_response.edit(content=f"No music found for {content}")
                 return
 
             globals_var.specifics_searches[message.guild.id] = {'searches': searches,
@@ -231,12 +230,12 @@ async def play(message: discord.Message, content: str, shuffle=False):
                           f'`{prefix}1-{len(globals_var.specifics_searches[message.guild.id]["searches"])}`:\n'
             for i in range(len(globals_var.specifics_searches[message.guild.id]['searches'])):
                 msg_content += f'**{i + 1}:** {globals_var.specifics_searches[message.guild.id]["searches"][i]}\n'
-            message = await message.channel.send(msg_content)
-            globals_var.specifics_searches[message.guild.id]['message'] = message
+            await message_response.edit(content=msg_content)
+            globals_var.specifics_searches[message.guild.id]['message'] = message_response
             # Can't add multiples reactions at once
             for i in range(len(globals_var.specifics_searches[message.guild.id]['searches'])):
                 try:
-                    await message.add_reaction(globals_var.reactions_song[i])
+                    await message_response.add_reaction(globals_var.reactions_song[i])
                 except discord.errors.NotFound:
                     pass
             return
