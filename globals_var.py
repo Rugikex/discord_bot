@@ -35,8 +35,8 @@ queues_musics = {}
 
 reactions_song = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
 reactions_queue = ["⬆️", "⬇️"]
+prefix = 'tk'
 
 
 def initialize():
     global current_music, specifics_searches, queues_musics, reactions_song, reactions_queue, client_bot, youtube
-

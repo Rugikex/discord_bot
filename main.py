@@ -1,12 +1,11 @@
+import datetime
 import re
 import discord
 
 import globals_var
+from globals_var import prefix, current_music, client_bot, specifics_searches, queues_musics
 import queue_gestion
 import voice_gestion
-
-
-prefix = 'tk'
 
 
 async def msg_help(message: discord.Message):
@@ -14,6 +13,7 @@ async def msg_help(message: discord.Message):
               f"`{prefix}play` or `{prefix}p`: Play music with <youtube url/playlist or search terms>.\n" \
               f"`{prefix}playshuffle` or `{prefix}ps`: Play music and shuffle queue.\n" \
               f"`{prefix}shuffle`: Shuffle queue.\n" \
+              f"`{prefix}nowplaying` or `{prefix}np`: Display message about the current playing music" \
               f"`{prefix}skip` or `{prefix}s`: Skip current music.\n" \
               f"`{prefix}clear`: Clear queue.\n" \
               f"`{prefix}stop`: Stop current music.\n" \
@@ -23,17 +23,35 @@ async def msg_help(message: discord.Message):
     await message.channel.send(content)
 
 
-@globals_var.client_bot.event
+async def display_current_music(message: discord.Message):
+    if message.guild.id not in current_music:
+        return
+
+    msg_content = f"Playing {current_music[message.guild.id]['music'].title}\n[Time] "
+
+    if current_music[message.guild.id]['is_paused']:
+        msg_content += f"({str(current_music[message.guild.id]['time_spent']).split('.')[0]}"
+    else:
+        duration = datetime.datetime.now() + current_music[message.guild.id]['time_spent']\
+                   - current_music[message.guild.id]['start_time']
+        duration_without_ms = str(duration).split('.')[0]
+        msg_content += f"({duration_without_ms}"
+
+    msg_content += f" / {current_music[message.guild.id]['music'].duration})"
+    await message.channel.send(msg_content)
+
+
+@client_bot.event
 async def on_ready():
     guilds = []
-    for guild in globals_var.client_bot.guilds:
+    for guild in client_bot.guilds:
         guilds.append(guild.name)
-    print(f'Logged in as {globals_var.client_bot.user} to {guilds}.')
+    print(f'Logged in as {client_bot.user} to {guilds}.')
 
 
-@globals_var.client_bot.event
+@client_bot.event
 async def on_message(message: discord.Message):
-    if message.author == globals_var.client_bot.user:
+    if message.author == client_bot.user:
         return
 
     if not message.content.startswith(prefix):
@@ -44,8 +62,8 @@ async def on_message(message: discord.Message):
         await message.channel.send(f'Need help? Check {prefix}help.')
         return
 
-    if message.guild.id in globals_var.specifics_searches and \
-            message.author == globals_var.specifics_searches[message.guild.id]['user']:
+    if message.guild.id in specifics_searches and \
+            message.author == specifics_searches[message.guild.id]['user']:
         try:
             number = int(content)
         except ValueError:
@@ -60,6 +78,10 @@ async def on_message(message: discord.Message):
 
     if content == 'help' or content == 'h':
         await msg_help(message)
+        return
+
+    if content == 'nowplaying' or content == 'np':
+        await display_current_music(message)
         return
 
     if content == 'queue':
@@ -135,12 +157,12 @@ async def on_message(message: discord.Message):
         return
 
 
-@globals_var.client_bot.event
+@client_bot.event
 async def on_reaction_add(reaction, user):
-    if user == globals_var.client_bot.user:
+    if user == client_bot.user:
         return
 
-    if user.guild.id in globals_var.queues_musics and reaction.message.author == globals_var.client_bot.user \
+    if user.guild.id in queues_musics and reaction.message.author == globals_var.client_bot.user \
             and reaction.message.content.startswith("Queue list(page "):
         if reaction.emoji not in globals_var.reactions_queue:
             return
@@ -149,7 +171,7 @@ async def on_reaction_add(reaction, user):
         if page == 1 and reaction.emoji == globals_var.reactions_queue[0]:
             return
 
-        if not globals_var.queues_musics[reaction.message.guild.id][page * 10:] \
+        if not queues_musics[reaction.message.guild.id][page * 10:] \
                 and reaction.emoji == globals_var.reactions_queue[1]:
             return
 
@@ -176,12 +198,14 @@ async def on_reaction_add(reaction, user):
                 globals_var.reactions_song[:len(globals_var.specifics_searches[user.guild.id]['searches']) + 1]:
             return
 
-        await voice_gestion.select_specific_search(reaction.message, globals_var.reactions_song.index(reaction.emoji)+1)
+        await voice_gestion.select_specific_search(reaction.message,
+                                                   globals_var.reactions_song.index(reaction.emoji) + 1)
 
 
 def main():
     globals_var.initialize()
-    globals_var.client_bot.run(globals_var.discord_key)
+    print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    client_bot.run(globals_var.discord_key)
 
 
 if __name__ == "__main__":

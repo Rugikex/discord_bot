@@ -1,13 +1,13 @@
 import asyncio
+import datetime
 
 import discord
 import youtube_dl
 
 import globals_var
+from globals_var import prefix, current_music
 import queue_gestion
 import youtube_requests
-from main import prefix
-
 
 ydl_opts = {
     'format': 'bestaudio/best',
@@ -39,14 +39,20 @@ async def next_music(message: discord.Message):
 
             voice_client.play(audio, after=lambda x=None: asyncio.run_coroutine_threadsafe(next_music(message),
                                                                                            globals_var.client_bot.loop))
-            if guild_id in globals_var.current_music:
-                await globals_var.current_music[guild_id].delete()
-            globals_var.current_music[guild_id] = await message.channel.send(f'Now playing {new_music}.')
+
+            if guild_id in current_music:
+                await current_music[guild_id]['message'].delete()
+
+            current_music[guild_id] = {'start_time': datetime.datetime.now(),
+                                       'time_spent': datetime.timedelta(seconds=0),
+                                       'music': new_music,
+                                       'is_paused': False,
+                                       'message': None}
+            current_music[guild_id]['message'] = await message.channel.send(f'Now playing {new_music}.')
         else:
             globals_var.queues_musics.pop(guild_id, None)
-            if guild_id in globals_var.current_music:
-                await globals_var.current_music[guild_id].delete()
-            globals_var.current_music.pop(guild_id, None)
+            await current_music[guild_id]['message'].delete()
+            current_music.pop(guild_id, None)
 
 
 async def get_voice_client(message: discord.Message):
@@ -90,6 +96,10 @@ async def pause_music(message: discord.Message):
 
     voice_client.pause()
 
+    current_music[message.guild.id]['is_paused'] = True
+    current_music[message.guild.id]['time_spent'] += datetime.datetime.now() - \
+                                                     current_music[message.guild.id]['start_time']
+
 
 async def resume_music(message: discord.Message):
     voice_client = await check_voice_client(message)
@@ -101,6 +111,8 @@ async def resume_music(message: discord.Message):
         return
 
     voice_client.resume()
+    current_music[message.guild.id]['is_paused'] = False
+    current_music[message.guild.id]['start_time'] = datetime.datetime.now()
 
 
 async def skip_music(message: discord.Message):
@@ -211,7 +223,7 @@ async def play(message: discord.Message, content: str, shuffle=False):
             if not searches:
                 await message.channel.send(f"No music found for {content}")
                 return
-            print(globals_var.specifics_searches)
+
             globals_var.specifics_searches[message.guild.id] = {'searches': searches,
                                                                 'shuffle': shuffle,
                                                                 'user': message.author}
@@ -223,8 +235,10 @@ async def play(message: discord.Message, content: str, shuffle=False):
             globals_var.specifics_searches[message.guild.id]['message'] = message
             # Can't add multiples reactions at once
             for i in range(len(globals_var.specifics_searches[message.guild.id]['searches'])):
-                await message.add_reaction(globals_var.reactions_song[i])
-            print(globals_var.specifics_searches)
+                try:
+                    await message.add_reaction(globals_var.reactions_song[i])
+                except discord.errors.NotFound:
+                    pass
             return
 
         if not musics:
