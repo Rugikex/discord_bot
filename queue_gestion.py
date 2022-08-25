@@ -12,7 +12,15 @@ def get_queue_total_time(message: discord.Message):
     res = datetime.timedelta(0)
     for item in globals_var.queues_musics[message.guild.id]:
         res += item.duration
-    return res
+
+    res += globals_var.current_music[message.guild.id]['music'].duration
+    if globals_var.current_music[message.guild.id]['is_paused']:
+        res -= globals_var.current_music[message.guild.id]['time_spent']
+    else:
+        duration = datetime.datetime.now() + globals_var.current_music[message.guild.id]['time_spent'] \
+                   - globals_var.current_music[message.guild.id]['start_time']
+        res -= duration
+    return res - datetime.timedelta(microseconds=res.microseconds)
 
 
 async def get_queue(message: discord.Message, page):
@@ -20,11 +28,11 @@ async def get_queue(message: discord.Message, page):
     if voice_client is None:
         return
 
-    if message.guild.id not in globals_var.queues_musics or not globals_var.queues_musics[message.guild.id]:
+    if message.guild.id not in globals_var.queues_musics:
         await my_message.send(message, "Queue is empty!")
         return
 
-    if not globals_var.queues_musics[message.guild.id][(page - 1) * 10:page * 10]:
+    if page != 1 and not globals_var.queues_musics[message.guild.id][(page - 1) * 10:page * 10]:
         await my_message.send(message, "Number page is too big!")
         return
 
@@ -58,6 +66,18 @@ async def clear_queue(message: discord.Message):
 
 def message_queue(message: discord.Message, page):
     msg_content = f'Queue list(page {page}):\n'
+    if page == 1:
+        msg_content += f'**Now.** {globals_var.current_music[message.guild.id]["music"].title } ['
+        if globals_var.current_music[message.guild.id]['is_paused']:
+            msg_content += f"{str(globals_var.current_music[message.guild.id]['time_spent']).split('.')[0]}"
+        else:
+            duration = datetime.datetime.now() + globals_var.current_music[message.guild.id]['time_spent'] \
+                       - globals_var.current_music[message.guild.id]['start_time']
+            duration_without_ms = str(duration).split('.')[0]
+            msg_content += f"{duration_without_ms}"
+
+        msg_content += f" / {globals_var.current_music[message.guild.id]['music'].duration}]\n"
+
     for i in range(len(globals_var.queues_musics[message.guild.id][(page - 1) * 10:page * 10])):
         msg_content += f'**{i + 1 + (page - 1) * 10}.** {globals_var.queues_musics[message.guild.id][i]}\n'
     msg_content += f'__Total time:__ {get_queue_total_time(message)}'
