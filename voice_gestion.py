@@ -23,45 +23,44 @@ FFMPEG_OPTIONS = {
 
 async def user_is_connected(message: discord.Message):
     if message.author.voice is None:
-        await message.channel.send('You have to be connected to a voice channel in this server!')
+        await my_message.send(message, 'You have to be connected to a voice channel in this server!')
         return False
 
     return True
 
 
 async def next_music(message: discord.Message):
+    voice_client = await get_voice_client(message)
     guild_id = message.guild.id
-    for voice_client in globals_var.client_bot.voice_clients:
-        if voice_client.guild.id != guild_id:
-            continue
 
-        if globals_var.queues_musics[guild_id]:
-            new_music = globals_var.queues_musics[guild_id].pop(0)
+    if globals_var.queues_musics[guild_id] and voice_client is not None:
+        new_music = globals_var.queues_musics[guild_id].pop(0)
 
-            with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(new_music.link, download=False)
-                url = info['formats'][0]['url']
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(new_music.link, download=False)
+            url = info['formats'][0]['url']
 
-            audio = discord.FFmpegPCMAudio(url,
-                                           before_options=FFMPEG_OPTIONS['before_options'],
-                                           options=FFMPEG_OPTIONS['options'])
+        audio = discord.FFmpegPCMAudio(url,
+                                       before_options=FFMPEG_OPTIONS['before_options'],
+                                       options=FFMPEG_OPTIONS['options'])
 
-            voice_client.play(audio, after=lambda x=None: asyncio.run_coroutine_threadsafe(next_music(message),
-                                                                                           globals_var.client_bot.loop))
+        voice_client.play(audio, after=lambda x=None: asyncio.run_coroutine_threadsafe(next_music(message),
+                                                                                       globals_var.client_bot.loop))
 
-            if guild_id in current_music:
-                await my_message.delete(current_music[guild_id]['message'])
-
-            current_music[guild_id] = {'start_time': datetime.datetime.now(),
-                                       'time_spent': datetime.timedelta(seconds=0),
-                                       'music': new_music,
-                                       'is_paused': False,
-                                       'message': None}
-            current_music[guild_id]['message'] = await message.channel.send(f'Now playing {new_music}.')
-        else:
-            globals_var.queues_musics.pop(guild_id, None)
+        if guild_id in current_music:
             await my_message.delete(current_music[guild_id]['message'])
-            current_music.pop(guild_id, None)
+
+        current_music[guild_id] = {'start_time': datetime.datetime.now(),
+                                   'time_spent': datetime.timedelta(seconds=0),
+                                   'music': new_music,
+                                   'is_paused': False,
+                                   'message': None}
+        current_music[guild_id]['message'] = await my_message.send(message, f'Now playing {new_music}.')
+
+    else:
+        globals_var.queues_musics.pop(guild_id, None)
+        await my_message.delete(current_music[guild_id]['message'])
+        current_music.pop(guild_id, None)
 
 
 async def get_voice_client(message: discord.Message):
@@ -70,12 +69,12 @@ async def get_voice_client(message: discord.Message):
 
     guilds_id = list(map(lambda n: n.channel.guild.id, globals_var.client_bot.voice_clients))
     if message.author.voice.channel.guild.id not in guilds_id:
-        await message.channel.send('I\'m not connected to this server.')
+        await my_message.send(message, 'I\'m not connected to this server.')
         return None
 
     channels = list(map(lambda n: n.channel, globals_var.client_bot.voice_clients))
     if message.author.voice.channel not in channels:
-        await message.channel.send('We are in different voice channels.')
+        await my_message.send(message, 'We are in different voice channels.')
         return None
 
     for voice_client in globals_var.client_bot.voice_clients:
@@ -84,6 +83,8 @@ async def get_voice_client(message: discord.Message):
             continue
         return voice_client
 
+    return None
+
 
 async def check_voice_client(message: discord.Message):
     voice_client = await get_voice_client(message)
@@ -91,7 +92,7 @@ async def check_voice_client(message: discord.Message):
         return None
 
     if voice_client.source is None:
-        await message.channel.send('No music is playing.')
+        await my_message.send(message, 'No music is playing.')
         return None
 
     return voice_client
@@ -103,7 +104,7 @@ async def pause_music(message: discord.Message):
         return
 
     if voice_client.is_paused():
-        await message.channel.send('The music is already paused.')
+        await my_message.send(message, 'The music is already paused.')
         return
 
     voice_client.pause()
@@ -119,7 +120,7 @@ async def resume_music(message: discord.Message):
         return
 
     if not voice_client.is_paused():
-        await message.channel.send('The music is already playing')
+        await my_message.send(message, 'The music is already playing')
         return
 
     voice_client.resume()
@@ -163,12 +164,12 @@ async def is_connected(message: discord.Message, channel):
     try:
         await channel.connect(timeout=1.5)
     except asyncio.TimeoutError:
-        await message.channel.send('I can\'t connect to this channel!')
+        await my_message.send(message, 'I can\'t connect to this channel!')
         return False
     except discord.errors.ClientException:
-        await message.channel.send('Already connected to {}.'
-                                   .format(list(set(voice_channels)
-                                                .intersection(message.guild.voice_channels))[0].name))
+        await my_message.send(message, 'Already connected to {}.'
+                              .format(list(set(voice_channels)
+                                           .intersection(message.guild.voice_channels))[0].name))
         return False
 
     print(f"Bot connects to {message.guild.name}.")
@@ -177,18 +178,12 @@ async def is_connected(message: discord.Message, channel):
 
 async def select_specific_search(message: discord.Message, number):
     if number < 1 or number > len(globals_var.specifics_searches[message.guild.id]['searches']):
-        await message.channel.send(f'Choose between 1 and '
-                                   f'{len(globals_var.specifics_searches[message.guild.id]["searches"])}')
+        await my_message.send(message, f'Choose between 1 and '
+                                       f'{len(globals_var.specifics_searches[message.guild.id]["searches"])}')
         return
 
     music = [globals_var.specifics_searches[message.guild.id]['searches'][number - 1]]
     shuffle = globals_var.specifics_searches[message.guild.id]['shuffle']
-
-    """
-    channel: discord.VoiceChannel = globals_var.client_bot.get_channel(message.author.voice.channel.id)
-    if not await is_connected(message, channel):
-        return
-    """
 
     voice_client = await get_voice_client(message)
 
@@ -197,7 +192,7 @@ async def select_specific_search(message: discord.Message, number):
 
     if voice_client.guild.id in globals_var.queues_musics:
         globals_var.queues_musics[voice_client.guild.id].extend(music)
-        await message.channel.send(f"Added to queue: \"{music[0].title}\".")
+        await my_message.send(message, f"Added to queue: \"{music[0].title}\".")
     else:
         globals_var.queues_musics[voice_client.guild.id] = music
 
@@ -218,18 +213,18 @@ async def play(message: discord.Message, content: str, shuffle=False):
 
     voice_client = await get_voice_client(message)
     if voice_client is None:
-        await message.channel.send("I have been disconnected.")
+        await my_message.send(message, "I have been disconnected.")
         return
 
     if content.startswith("https://www.youtube.com/playlist?list=") or \
             (content.startswith("https://www.youtube.com/watch?v=") and "list=" in content):
-        message_loading = await message.channel.send("Loading playlist...")
+        message_loading = await my_message.send(message, "Loading playlist...")
         musics = youtube_requests.playlist_link(content)
         await my_message.delete(message_loading)
     elif content.startswith("https://www.youtube.com/watch?v="):
         musics = youtube_requests.single_link(content)
     else:
-        message_response = await message.channel.send(f"Searching for music related to {content}.")
+        message_response = await my_message.send(message, f"Searching for music related to {content}.")
         searches = youtube_requests.specific_search(content)
         if not searches:
             await my_message.edit_content(message_response, f"No music found for {content}")
@@ -250,21 +245,21 @@ async def play(message: discord.Message, content: str, shuffle=False):
         return
 
     if not musics:
-        await message.channel.send(f'No audio could be found for {content}')
+        await my_message.send(message, f'No audio could be found for {content}')
         return
 
     if voice_client.guild.id in globals_var.queues_musics:
         globals_var.queues_musics[voice_client.guild.id].extend(musics)
         if len(musics) > 1:
-            await message.channel.send(f"Added {len(musics)} musics to queue.")
+            await my_message.send(message, f"Added {len(musics)} musics to queue.")
         else:
-            await message.channel.send(f"Added to queue: \"{musics[0].title}\".")
+            await my_message.send(message, f"Added to queue: \"{musics[0].title}\".")
     else:
         globals_var.queues_musics[voice_client.guild.id] = musics
         if len(musics) - 1 > 1:
-            await message.channel.send(f"Added {len(musics) - 1} musics to queue.")
+            await my_message.send(message, f"Added {len(musics) - 1} musics to queue.")
         elif len(musics) == 2:
-            await message.channel.send(f"Added to queue: \"{musics[1].title}\".")
+            await my_message.send(message, f"Added to queue: \"{musics[1].title}\".")
 
     if shuffle:
         await queue_gestion.shuffle_queue(message)

@@ -21,14 +21,14 @@ async def get_queue(message: discord.Message, page):
         return
 
     if message.guild.id not in globals_var.queues_musics or not globals_var.queues_musics[message.guild.id]:
-        await message.channel.send("Queue is empty!")
+        await my_message.send(message, "Queue is empty!")
         return
 
     if not globals_var.queues_musics[message.guild.id][(page - 1) * 10:page * 10]:
-        await message.channel.send("Number page is too big!")
+        await my_message.send(message, "Number page is too big!")
         return
 
-    message_response = await message.channel.send(message_queue(message, page))
+    message_response = await my_message.send(message, message_queue(message, page))
     await reactions_on_message_queue(message_response, page)
 
 

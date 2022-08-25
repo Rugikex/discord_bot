@@ -1,11 +1,18 @@
 import discord
 
 
+async def send(message: discord.Message, content, delete_after=None):
+    try:
+        return await message.channel.send(content, delete_after=delete_after)
+    except discord.errors.HTTPException:
+        pass
+
+
 async def edit_content(message: discord.Message, content):
     try:
         await message.edit(content=content)
     except discord.errors.HTTPException:
-        message = await message.channel.send(content)
+        message = await send(message, content)
     return message
 
 

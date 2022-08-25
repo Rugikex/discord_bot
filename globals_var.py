@@ -14,18 +14,17 @@ youtube = build("youtube", "v3", developerKey=youtube_key)
 
 """Can be change
 Store by guild id
-Containing:
-    'start_time': datetime.datetime.now(),
-    'time_spent': datetime.timedelta(seconds=0),
-    'music': new_music,
-    'is_paused': False,
-    'message': None
+Contains:
+    'start_time': date the music started or restart after pause,
+    'time_spent': duration spent after the last time the music was paused,
+    'music': music currently playing,
+    'is_paused': check if the music is paused,
+    'message': message that display which music is currently playing
 """
 current_music = {}
 """
 Store by guild id
-Contains searches if user requests song with search terms
-Each key stores a dict containing:
+Contains:
     'searches': list of 1 to 5 MusicItem about the last search terms
     'shuffle': boolean to know if the music must be shuffled
     'user': user who requested the song

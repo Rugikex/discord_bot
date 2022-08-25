@@ -3,6 +3,7 @@ import re
 import discord
 
 import globals_var
+import my_message
 from globals_var import prefix, current_music, client_bot, specifics_searches, queues_musics
 import queue_gestion
 import voice_gestion
@@ -20,7 +21,7 @@ async def msg_help(message: discord.Message):
               f"`{prefix}resume`: Resume current music.\n" \
               f"`{prefix}quit`: Disconnect the bot.\n"
 
-    await message.channel.send(content)
+    await my_message.send(message, content)
 
 
 async def display_current_music(message: discord.Message):
@@ -38,7 +39,7 @@ async def display_current_music(message: discord.Message):
         msg_content += f"{duration_without_ms}"
 
     msg_content += f" / {current_music[message.guild.id]['music'].duration}]"
-    await message.channel.send(msg_content)
+    await my_message.send(message, msg_content)
 
 
 @client_bot.event
@@ -59,7 +60,7 @@ async def on_message(message: discord.Message):
 
     content = str(message.content[len(prefix):])
     if len(content) == 0:
-        await message.channel.send(f'Need help? Check {prefix}help.')
+        await my_message.send(message, f'Need help? Check {prefix}help.')
         return
 
     if message.guild.id in specifics_searches and \
@@ -69,6 +70,10 @@ async def on_message(message: discord.Message):
             number = int(content)
         except ValueError:
             can_exec = False
+
+        if 'message' not in globals_var.specifics_searches[message.guild.id]:
+            await my_message.send(message, 'Wait loading please.', delete_after=3)
+            return
 
         if can_exec:
             await voice_gestion.select_specific_search(message, number)
@@ -106,7 +111,7 @@ async def on_message(message: discord.Message):
         if not await voice_gestion.user_is_connected(message):
             return
 
-        await message.channel.send(f'{prefix}play <youtube url/playlist or search terms>')
+        await my_message.send(message, f'{prefix}play <youtube url/playlist or search terms>')
         return
 
     if content.startswith('play ') or content.startswith('p '):
@@ -121,7 +126,7 @@ async def on_message(message: discord.Message):
         if not await voice_gestion.user_is_connected(message):
             return
 
-        await message.channel.send(f'{prefix}playshuffle <youtube url/playlist or search terms>')
+        await my_message.send(message, f'{prefix}playshuffle <youtube url/playlist or search terms>')
         return
 
     if content.startswith('playshuffle ') or content.startswith('ps '):
@@ -187,7 +192,8 @@ async def on_reaction_add(reaction, user):
             return
 
         if user.voice is None:
-            await reaction.message.channel.send('You have to be connected to a voice channel in this server!', delete_after=10)
+            await my_message.send(reaction.message, 'You have to be connected to a voice channel in this server!',
+                                  delete_after=10)
             return
 
         if reaction.emoji not in \
