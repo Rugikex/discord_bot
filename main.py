@@ -13,7 +13,7 @@ async def msg_help(message: discord.Message):
               f"`{prefix}play` or `{prefix}p`: Play music with <youtube url/playlist or search terms>.\n" \
               f"`{prefix}playshuffle` or `{prefix}ps`: Play music and shuffle queue.\n" \
               f"`{prefix}shuffle`: Shuffle queue.\n" \
-              f"`{prefix}nowplaying` or `{prefix}np`: Display message about the current playing music" \
+              f"`{prefix}nowplaying` or `{prefix}np`: Display message about the current playing music\n" \
               f"`{prefix}skip` or `{prefix}s`: Skip current music.\n" \
               f"`{prefix}clear`: Clear queue.\n" \
               f"`{prefix}stop`: Stop current music.\n" \
@@ -27,17 +27,17 @@ async def display_current_music(message: discord.Message):
     if message.guild.id not in current_music:
         return
 
-    msg_content = f"Playing {current_music[message.guild.id]['music'].title}\n[Time] "
+    msg_content = f"Playing {current_music[message.guild.id]['music'].title}\n[Time] ["
 
     if current_music[message.guild.id]['is_paused']:
-        msg_content += f"({str(current_music[message.guild.id]['time_spent']).split('.')[0]}"
+        msg_content += f"{str(current_music[message.guild.id]['time_spent']).split('.')[0]}"
     else:
         duration = datetime.datetime.now() + current_music[message.guild.id]['time_spent']\
                    - current_music[message.guild.id]['start_time']
         duration_without_ms = str(duration).split('.')[0]
-        msg_content += f"({duration_without_ms}"
+        msg_content += f"{duration_without_ms}"
 
-    msg_content += f" / {current_music[message.guild.id]['music'].duration})"
+    msg_content += f" / {current_music[message.guild.id]['music'].duration}]"
     await message.channel.send(msg_content)
 
 
@@ -64,13 +64,15 @@ async def on_message(message: discord.Message):
 
     if message.guild.id in specifics_searches and \
             message.author == specifics_searches[message.guild.id]['user']:
+        can_exec = True
         try:
             number = int(content)
         except ValueError:
-            return
+            can_exec = False
 
-        await voice_gestion.select_specific_search(message, number)
-        return
+        if can_exec:
+            await voice_gestion.select_specific_search(message, number)
+            return
 
     if content == 'clear':
         await queue_gestion.clear_queue(message)
@@ -101,18 +103,13 @@ async def on_message(message: discord.Message):
         return
 
     if content == 'play' or content == 'p':
-        if message.author.voice is None:
-            await message.channel.send('You have to be connected to a voice channel in this server!')
+        if not await voice_gestion.user_is_connected(message):
             return
 
         await message.channel.send(f'{prefix}play <youtube url/playlist or search terms>')
         return
 
     if content.startswith('play ') or content.startswith('p '):
-        if message.author.voice is None:
-            await message.channel.send('You have to be connected to a voice channel in this server!')
-            return
-
         if content.startswith('p '):
             content = content[2:].strip()
         else:
@@ -121,18 +118,13 @@ async def on_message(message: discord.Message):
         return
 
     if content == 'playshuffle' or content == 'ps':
-        if message.author.voice is None:
-            await message.channel.send('You have to be connected to a voice channel in this server!')
+        if not await voice_gestion.user_is_connected(message):
             return
 
         await message.channel.send(f'{prefix}playshuffle <youtube url/playlist or search terms>')
         return
 
     if content.startswith('playshuffle ') or content.startswith('ps '):
-        if message.author.voice is None:
-            await message.channel.send('You have to be connected to a voice channel in this server!')
-            return
-
         if content.startswith('ps '):
             content = content[3:].strip()
         else:
@@ -194,6 +186,10 @@ async def on_reaction_add(reaction, user):
         if user != globals_var.specifics_searches[user.guild.id]['user']:
             return
 
+        if user.voice is None:
+            await reaction.message.channel.send('You have to be connected to a voice channel in this server!', delete_after=10)
+            return
+
         if reaction.emoji not in \
                 globals_var.reactions_song[:len(globals_var.specifics_searches[user.guild.id]['searches']) + 1]:
             return
@@ -204,7 +200,6 @@ async def on_reaction_add(reaction, user):
 
 def main():
     globals_var.initialize()
-    print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     client_bot.run(globals_var.discord_key)
 
 

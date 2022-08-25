@@ -4,6 +4,7 @@ import random
 import discord
 
 import globals_var
+import my_message
 import voice_gestion
 
 
@@ -40,7 +41,7 @@ async def shuffle_queue(message: discord.Message):
         return
 
     random.shuffle(globals_var.queues_musics[message.guild.id])
-    await message.add_reaction("🔀")
+    await my_message.add_reaction(message, "🔀")
 
 
 async def clear_queue(message: discord.Message):
@@ -52,7 +53,7 @@ async def clear_queue(message: discord.Message):
         return
 
     globals_var.queues_musics[voice_client.guild.id] = None
-    await message.add_reaction("💣")
+    await my_message.add_reaction(message, "💣")
 
 
 def message_queue(message: discord.Message, page):
@@ -65,7 +66,7 @@ def message_queue(message: discord.Message, page):
 
 async def reactions_on_message_queue(message: discord.Message, page):
     if page != 1:
-        await message.add_reaction(globals_var.reactions_queue[0])
+        await my_message.add_reaction(message, globals_var.reactions_queue[0])
 
     if globals_var.queues_musics[message.guild.id][page * 10:]:
-        await message.add_reaction(globals_var.reactions_queue[1])
+        await my_message.add_reaction(message, globals_var.reactions_queue[1])

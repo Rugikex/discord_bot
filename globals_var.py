@@ -14,7 +14,12 @@ youtube = build("youtube", "v3", developerKey=youtube_key)
 
 """Can be change
 Store by guild id
-Contains the message displaying which music is playing
+Containing:
+    'start_time': datetime.datetime.now(),
+    'time_spent': datetime.timedelta(seconds=0),
+    'music': new_music,
+    'is_paused': False,
+    'message': None
 """
 current_music = {}
 """
