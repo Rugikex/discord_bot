@@ -54,6 +54,7 @@ def playlist_link(link):
     urls.extend(pytube.Playlist(link).video_urls)
     res = []
     while urls:
+        print(f"Remaining musics: {len(urls)}")
         video_ids = list(map(lambda n: n.split("https://www.youtube.com/watch?v=", 1)[1], urls[:50]))
         res.extend(create_music_items(video_ids))
         urls = urls[50:]

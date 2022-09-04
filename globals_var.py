@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from googleapiclient.discovery import build
 
 load_dotenv()
+print("prout")
 
 discord_key = os.getenv("DISCORD_KEY")
 client_bot = discord.Client(intents=discord.Intents.all())
@@ -37,11 +38,12 @@ Store by guild id
 Contains a list of MusicItem(s) if users request multiples musics
 """
 queues_musics = {}
+queues_message = {}
 
 reactions_song = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
 reactions_queue = ["⬆️", "⬇️"]
-prefix = 'tk'
 
 
 def initialize():
-    global current_music, specifics_searches, queues_musics, reactions_song, reactions_queue, client_bot, youtube, tree
+    global current_music, specifics_searches, queues_musics, queues_message,\
+        reactions_song, reactions_queue, client_bot, youtube, tree
