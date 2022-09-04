@@ -4,7 +4,7 @@ import discord
 
 import globals_var
 import my_message
-from globals_var import prefix, current_music, client_bot, specifics_searches, queues_musics
+from globals_var import prefix, current_music, client_bot, specifics_searches, queues_musics, tree
 import queue_gestion
 import voice_gestion
 
@@ -14,8 +14,9 @@ async def msg_help(message: discord.Message):
               f"`{prefix}play` or `{prefix}p`: Play music with <youtube url/playlist or search terms>.\n" \
               f"`{prefix}playshuffle` or `{prefix}ps`: Play music and shuffle queue.\n" \
               f"`{prefix}shuffle`: Shuffle queue.\n" \
-              f"`{prefix}nowplaying` or `{prefix}np`: Display message about the current playing music\n" \
-              f"`{prefix}skip` or `{prefix}s`: Skip current music.\n" \
+              f"`{prefix}nowplaying` or `{prefix}np`: Display current playing music\n" \
+              f"`{prefix}queue (number)`: Display queue.\n" \
+              f"`{prefix}skip (number)` or `{prefix}s (number)`: Skip 1 or `number` music(s).\n" \
               f"`{prefix}clear`: Clear queue.\n" \
               f"`{prefix}stop`: Stop current music.\n" \
               f"`{prefix}resume`: Resume current music.\n" \
@@ -24,22 +25,22 @@ async def msg_help(message: discord.Message):
     await my_message.send(message, content)
 
 
-async def display_current_music(message: discord.Message):
-    if message.guild.id not in current_music:
+async def display_current_music(interaction: discord.Interaction):
+    if interaction.guild_id not in current_music:
         return
 
-    msg_content = f"Playing {current_music[message.guild.id]['music'].title}\n[Time] ["
+    msg_content = f"Playing {current_music[interaction.guild_id]['music'].title}\n[Time] ["
 
-    if current_music[message.guild.id]['is_paused']:
-        msg_content += f"{str(current_music[message.guild.id]['time_spent']).split('.')[0]}"
+    if current_music[interaction.guild_id]['is_paused']:
+        msg_content += f"{str(current_music[interaction.guild_id]['time_spent']).split('.')[0]}"
     else:
-        duration = datetime.datetime.now() + current_music[message.guild.id]['time_spent']\
-                   - current_music[message.guild.id]['start_time']
+        duration = datetime.datetime.now() + current_music[interaction.guild_id]['time_spent'] \
+                   - current_music[interaction.guild_id]['start_time']
         duration_without_ms = str(duration).split('.')[0]
         msg_content += f"{duration_without_ms}"
 
-    msg_content += f" / {current_music[message.guild.id]['music'].duration}]"
-    await my_message.send(message, msg_content)
+    msg_content += f" / {current_music[interaction.guild_id]['music'].duration}]"
+    await my_message.send(interaction, msg_content)
 
 
 @client_bot.event
@@ -47,6 +48,7 @@ async def on_ready():
     guilds = []
     for guild in client_bot.guilds:
         guilds.append(guild.name)
+    await tree.sync()
     print(f'Logged in as {client_bot.user} to {guilds}.')
 
 
@@ -58,16 +60,12 @@ async def on_message(message: discord.Message):
     if not message.content.startswith(prefix):
         return
 
-    content = str(message.content[len(prefix):])
-    if len(content) == 0:
-        await my_message.send(message, f'Need help? Check {prefix}help.')
-        return
-
+    # FIXME old, now with new reactions
     if message.guild.id in specifics_searches and \
             message.author == specifics_searches[message.guild.id]['user']:
         can_exec = True
         try:
-            number = int(content)
+            number = int("42")
         except ValueError:
             can_exec = False
 
@@ -79,85 +77,13 @@ async def on_message(message: discord.Message):
             await voice_gestion.select_specific_search(message, number)
             return
 
-    if content == 'clear':
-        await queue_gestion.clear_queue(message)
-        return
-
-    if content == 'help' or content == 'h':
-        await msg_help(message)
-        return
-
-    if content == 'nowplaying' or content == 'np':
-        await display_current_music(message)
-        return
-
-    if content == 'queue':
-        await queue_gestion.get_queue(message, 1)
-        return
-
-    if re.compile("queue [0-9]+").match(content):
-        await queue_gestion.get_queue(message, int(re.search("queue ([0-9]+)", content).group(1)))
-        return
-
-    if content == 'quit':
-        await voice_gestion.disconnect(message)
-        return
-
-    if content == 'pause':
-        await voice_gestion.pause_music(message)
-        return
-
-    if content == 'play' or content == 'p':
-        if not await voice_gestion.user_is_connected(message):
-            return
-
-        await my_message.send(message, f'{prefix}play <youtube url/playlist or search terms>')
-        return
-
-    if content.startswith('play ') or content.startswith('p '):
-        if content.startswith('p '):
-            content = content[2:].strip()
-        else:
-            content = content[5:].strip()
-        await voice_gestion.play(message, content)
-        return
-
-    if content == 'playshuffle' or content == 'ps':
-        if not await voice_gestion.user_is_connected(message):
-            return
-
-        await my_message.send(message, f'{prefix}playshuffle <youtube url/playlist or search terms>')
-        return
-
-    if content.startswith('playshuffle ') or content.startswith('ps '):
-        if content.startswith('ps '):
-            content = content[3:].strip()
-        else:
-            content = content[12:].strip()
-        await voice_gestion.play(message, content, shuffle=True)
-        return
-
-    if content == 'resume':
-        await voice_gestion.resume_music(message)
-        return
-
-    if content == 'shuffle':
-        await queue_gestion.shuffle_queue(message)
-        return
-
-    if content == 'skip' or content == 's':
-        await voice_gestion.skip_music(message)
-        return
-
-    if content == 'stop':
-        await voice_gestion.stop_music(message)
-        return
-
 
 @client_bot.event
 async def on_reaction_add(reaction, user):
     if user == client_bot.user:
         return
+
+    print("cacaOUI")
 
     if user.guild.id in queues_musics and reaction.message.author == globals_var.client_bot.user \
             and reaction.message.content.startswith("Queue list(page "):
@@ -202,6 +128,67 @@ async def on_reaction_add(reaction, user):
 
         await voice_gestion.select_specific_search(reaction.message,
                                                    globals_var.reactions_song.index(reaction.emoji) + 1)
+
+
+@tree.command(name="clear", description="Clear the queue")
+async def self(interaction: discord.Interaction):
+    await queue_gestion.clear_queue(interaction)
+
+
+@tree.command(name="nowplaying", description="Display the current music")
+async def self(interaction: discord.Interaction):
+    await display_current_music(interaction)
+
+
+@tree.command(name="disconnect", description="Disconnect the bot")
+async def self(interaction: discord.Interaction):
+    await voice_gestion.disconnect(interaction)
+
+
+@tree.command(name="pause", description="Pause the current music")
+async def self(interaction: discord.Interaction):
+    await voice_gestion.pause_music(interaction)
+
+
+@tree.command(name="play", description="Play youtube url/playlist or search terms")
+async def self(interaction: discord.Interaction, music: str):
+    await voice_gestion.play(interaction, music)
+
+
+@tree.command(name="play_shuffle", description="Play and shuffle musics")
+async def self(interaction: discord.Interaction, music: str):
+    await voice_gestion.play(interaction, music, shuffle=True)
+
+
+@tree.command(name="queue", description="Display the queue")
+async def self(interaction: discord.Interaction, page: int = 1):
+    await queue_gestion.get_queue(interaction, page)
+
+
+@tree.command(name="resume", description="Resume the current music")
+async def self(interaction: discord.Interaction):
+    await voice_gestion.resume_music(interaction)
+
+
+@tree.command(name="shuffle", description="Shuffle musics")
+async def self(interaction: discord.Interaction):
+    await queue_gestion.shuffle_queue(interaction)
+
+
+@tree.command(name="skip", description="Skip the current music")
+async def self(interaction: discord.Interaction):
+    await voice_gestion.skip_music(interaction)
+
+
+@tree.command(name="stop", description="Stop music")
+async def self(interaction: discord.Interaction):
+    await voice_gestion.stop_music(interaction)
+
+
+@tree.command(name="caca", description="C'est delicieux")
+async def self(interaction: discord.Interaction):
+    if __name__ == '__main__':
+        await interaction.response.send_message("C'est vrai que c'est delicieux !")
 
 
 def main():

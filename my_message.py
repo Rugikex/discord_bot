@@ -1,19 +1,28 @@
 import discord
 
 
-async def send(message: discord.Message, content, delete_after=None):
+async def send_by_channel(channel, content):
+    if not channel:
+        return
     try:
-        return await message.channel.send(content, delete_after=delete_after)
+        await channel.send(content)
     except discord.errors.HTTPException:
         pass
 
 
-async def edit_content(message: discord.Message, content):
+async def send(interaction: discord.Interaction, content, delete_after=None):
     try:
-        await message.edit(content=content)
+        await interaction.response.send_message(content)
     except discord.errors.HTTPException:
-        message = await send(message, content)
-    return message
+        pass
+
+
+async def edit_content(interaction: discord.Interaction, content):
+    try:
+        interaction_message = await interaction.original_response()
+        await interaction_message.edit(content=content)
+    except discord.errors.HTTPException:
+        await send_by_channel(interaction.channel, content)
 
 
 async def delete(message: discord.Message):
@@ -23,8 +32,9 @@ async def delete(message: discord.Message):
         pass
 
 
-async def add_reaction(message: discord.Message, reaction):
+async def add_reaction(interaction: discord.Interaction, reaction):
     try:
-        await message.add_reaction(reaction)
+        interaction_message = await interaction.original_response()
+        await interaction_message.add_reaction(reaction)
     except discord.errors.NotFound:
         pass

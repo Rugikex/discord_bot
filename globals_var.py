@@ -7,7 +7,8 @@ from googleapiclient.discovery import build
 load_dotenv()
 
 discord_key = os.getenv("DISCORD_KEY")
-client_bot = discord.Client()
+client_bot = discord.Client(intents=discord.Intents.all())
+tree = discord.app_commands.CommandTree(client_bot)
 
 youtube_key = os.getenv("YOUTUBE_KEY")
 youtube = build("youtube", "v3", developerKey=youtube_key)
@@ -43,4 +44,4 @@ prefix = 'tk'
 
 
 def initialize():
-    global current_music, specifics_searches, queues_musics, reactions_song, reactions_queue, client_bot, youtube
+    global current_music, specifics_searches, queues_musics, reactions_song, reactions_queue, client_bot, youtube, tree
