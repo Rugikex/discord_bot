@@ -13,6 +13,7 @@ async def msg_help(interaction: discord.Interaction):
     content = "`clear`: Clear the queue.\n" \
               "`disconnect`: Disconnect the bot.\n" \
               "`help`: Display this message.\n" \
+              "`move position new_position`: Move the 'position' music to 'new_position'.\n" \
               "`nowplaying`: Display the current music.\n" \
               "`pause`: Pause the current music.\n" \
               "`play`: Play <youtube url/playlist or search terms>.\n" \
@@ -79,6 +80,11 @@ async def self(interaction: discord.Interaction):
     await msg_help(interaction)
 
 
+@tree.command(name="move", description="Move the 'position' music to 'new_position'")
+async def self(interaction: discord.Interaction, position: int, new_position: int):
+    await queue_gestion.move_music(interaction, position, new_position)
+
+
 @tree.command(name="nowplaying", description="Display the current music.")
 async def self(interaction: discord.Interaction):
     await display_current_music(interaction)
@@ -135,7 +141,7 @@ async def self(interaction: discord.Interaction):
 @tree.command(name="skip", description="Skip the current music or first 'number' musics.")
 async def self(interaction: discord.Interaction, number: int = 1):
     if number < 1:
-        await my_functions.send(interaction, "Number is incorrect!")
+        await my_functions.send(interaction, "Numbers are incorrect!")
         return
 
     await voice_gestion.skip_music(interaction, number)

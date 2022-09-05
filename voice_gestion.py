@@ -193,7 +193,7 @@ async def is_connected(interaction: discord.Interaction, channel):
     return True
 
 
-async def select_specific_search(interaction: discord.Interaction, number):
+async def select_specific_search(interaction: discord.Interaction, number, content):
     music = [globals_var.specifics_searches[interaction.guild_id]['searches'][number]]
     shuffle = globals_var.specifics_searches[interaction.guild_id]['shuffle']
     if 'position' in globals_var.specifics_searches[interaction.guild_id]:
@@ -203,10 +203,10 @@ async def select_specific_search(interaction: discord.Interaction, number):
 
     voice_client = await get_voice_client(interaction)
 
-    await my_functions.delete_msg(await globals_var.specifics_searches[interaction.guild_id]['message'])
+    await my_functions.delete_msg(globals_var.specifics_searches[interaction.guild_id]['message'])
     globals_var.specifics_searches.pop(interaction.guild_id, None)
 
-    await queue_gestion.add_in_queue(interaction, music, position=position)
+    await queue_gestion.add_in_queue(interaction, music, position, content)
 
     if shuffle and not position:
         await queue_gestion.shuffle_queue(interaction)
@@ -215,11 +215,11 @@ async def select_specific_search(interaction: discord.Interaction, number):
         await next_music(interaction)
 
 
-async def create_button_select(number):
+async def create_button_select(number, content):
     button = discord.ui.Button(emoji=globals_var.reactions_song[number])
 
     async def button_callback(interact: discord.Interaction):
-        await select_specific_search(interact, number)
+        await select_specific_search(interact, number, content)
 
     button.callback = button_callback
     return button
@@ -237,8 +237,8 @@ async def play(interaction: discord.Interaction, content: str, shuffle=False, po
         await my_functions.send(interaction, "I have been disconnected.")
         return
 
-    if (position and interaction not in globals_var.queues_musics) or \
-            (position and interaction in globals_var.queues_musics and
+    if (position and interaction.guild_id not in globals_var.queues_musics) or \
+            (position and interaction.guild_id in globals_var.queues_musics and
              (position < 1 or position > len(globals_var.queues_musics[interaction.guild_id]))):
         position = None
 
@@ -253,7 +253,7 @@ async def play(interaction: discord.Interaction, content: str, shuffle=False, po
         await my_functions.delete_msg(await interaction.original_response())
     else:
         if interaction.guild_id in globals_var.specifics_searches:
-            await my_functions.delete_msg(await globals_var.specifics_searches[interaction.guild_id]['message'])
+            await my_functions.delete_msg(globals_var.specifics_searches[interaction.guild_id]['message'])
 
         await my_functions.send(interaction, f"Searching for music related to {content}.")
         searches = await globals_var.client_bot.loop.run_in_executor(None, youtube_requests.specific_search, content)
@@ -265,14 +265,14 @@ async def play(interaction: discord.Interaction, content: str, shuffle=False, po
                                                                 'shuffle': shuffle,
                                                                 'position': position,
                                                                 'user': interaction.user,
-                                                                'message': interaction.original_response()}
+                                                                'message': await interaction.original_response()}
         msg_content = f'Select a track with buttons.\n\n'
         for i in range(len(globals_var.specifics_searches[interaction.guild.id]['searches'])):
             msg_content += f'**{i + 1}:** {globals_var.specifics_searches[interaction.guild.id]["searches"][i]}\n'
 
         view = discord.ui.View()
         for i in range(len(globals_var.specifics_searches[interaction.guild.id]['searches'])):
-            view.add_item(await create_button_select(i))
+            view.add_item(await create_button_select(i, content))
 
         await my_functions.edit(interaction, content=msg_content, view=view)
 
@@ -285,7 +285,7 @@ async def play(interaction: discord.Interaction, content: str, shuffle=False, po
     if shuffle and position:
         random.shuffle(musics)
 
-    await queue_gestion.add_in_queue(interaction, musics, position)
+    await queue_gestion.add_in_queue(interaction, musics, position, content)
 
     if shuffle and not position:
         await queue_gestion.shuffle_queue(interaction)

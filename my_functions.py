@@ -27,6 +27,13 @@ async def edit(interaction: discord.Interaction, content=discord.utils.MISSING, 
         await send_by_channel(interaction.channel, content)
 
 
+async def edit_response(response: discord.InteractionMessage, content=discord.utils.MISSING, view=discord.utils.MISSING):
+    try:
+        await response.edit(content=content, view=view)
+    except discord.errors.HTTPException:
+        pass
+
+
 # message can be discord.Message or discord.InteractionMessage
 async def delete_msg(message):
     try:

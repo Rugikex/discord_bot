@@ -24,6 +24,23 @@ def get_queue_total_time(guild_id):
     return res - datetime.timedelta(microseconds=res.microseconds)
 
 
+async def move_music(interaction: discord.Interaction, position, new_position):
+    if interaction.guild_id not in globals_var.queues_musics or not globals_var.queues_musics[interaction.guild_id]:
+        await my_functions.send(interaction, "Queue is empty!")
+        return
+
+    if new_position < 1 or position < 1 \
+            or len(globals_var.queues_musics[interaction.guild_id]) + 1 < position \
+            or len(globals_var.queues_musics[interaction.guild_id]) + 1 < new_position:
+        await my_functions.send(interaction, "Numbers are incorrect!")
+        return
+
+    music = globals_var.queues_musics[interaction.guild_id].pop(position - 1)
+    globals_var.queues_musics[interaction.guild_id].insert(new_position - 1, music)
+
+    await my_functions.send(interaction, f"Move {music} from position {position} to position {new_position}.")
+
+
 async def remove_musics(interaction: discord.Interaction, begin, end):
     voice_client = await voice_gestion.check_voice_client(interaction)
     if voice_client is None:
@@ -41,7 +58,7 @@ async def remove_musics(interaction: discord.Interaction, begin, end):
     await my_functions.send(interaction, f"Remove {counter} music(s).")
 
 
-async def get_queue(interaction: discord.Interaction, page):
+async def get_queue(interaction: discord.Interaction, page, is_new=True):
     voice_client = await voice_gestion.check_voice_client(interaction)
     if voice_client is None:
         return
@@ -60,36 +77,47 @@ async def get_queue(interaction: discord.Interaction, page):
 
     content = message_queue(interaction, page)
 
-    if interaction.guild_id in globals_var.queues_message:
-        await my_functions.delete_msg(await globals_var.queues_message[interaction.guild_id])
+    if interaction.guild_id in globals_var.queues_message and is_new:
+        await my_functions.delete_msg(globals_var.queues_message[interaction.guild_id])
 
-    await my_functions.send(interaction, content)
-    await buttons_on_message_queue(interaction, page)
-    globals_var.queues_message[interaction.guild_id] = interaction.original_response()
+    if interaction.guild_id in globals_var.queues_message and not is_new:
+        await my_functions.edit_response(globals_var.queues_message[interaction.guild_id], content=content)
+        await edit_buttons_on_message_queue(globals_var.queues_message[interaction.guild_id], interaction.guild_id, page)
+        await interaction.response.defer()
+    else:
+        await my_functions.send(interaction, content)
+        await create_buttons_on_message_queue(interaction, page)
+        globals_var.queues_message[interaction.guild_id] = await interaction.original_response()
 
 
-async def add_in_queue(interaction: discord.Interaction, musics, position):
+async def add_in_queue(interaction: discord.Interaction, musics, position, content):
     if position is not None:
         for i in range(len(musics)):
             globals_var.queues_musics[interaction.guild_id].insert(position - 1 + i, musics[i])
         if len(musics) > 1:
             await my_functions.send(interaction, f"Added {len(musics)} musics to {position} at "
-                                                 f"{position + len(musics)} in queue.")
+                                                 f"{position + len(musics)} in queue.\n"
+                                                 f"From: \"{content}\".")
         else:
-            await my_functions.send(interaction, f"Added in position {position} to queue: \"{musics[0].title}\".")
+            await my_functions.send(interaction, f"Added in position {position} to queue: \"{musics[0]}\".\n"
+                                                 f"From: \"{content}\".")
 
     elif interaction.guild_id in globals_var.queues_musics:
         globals_var.queues_musics[interaction.guild_id].extend(musics)
         if len(musics) > 1:
-            await my_functions.send(interaction, f"Added {len(musics)} musics to queue.")
+            await my_functions.send(interaction, f"Added {len(musics)} musics to queue.\n"
+                                                 f"From: \"{content}\".")
         else:
-            await my_functions.send(interaction, f"Added to queue: \"{musics[0].title}\".")
+            await my_functions.send(interaction, f"Added to queue: \"{musics[0]}\".\n"
+                                                 f"From: \"{content}\".")
     else:
         globals_var.queues_musics[interaction.guild_id] = musics
         if len(musics) - 1 > 1:
-            await my_functions.send(interaction, f"Added {len(musics)} musics to queue.")
+            await my_functions.send(interaction, f"Added {len(musics)} musics to queue.\n"
+                                                 f"From: \"{content}\".")
         elif len(musics) == 2:
-            await my_functions.send(interaction, f"Added to queue: \"{musics[1].title}\".")
+            await my_functions.send(interaction, f"Added to queue: \"{musics[1]}\".\n"
+                                                 f"From: \"{content}\".")
 
 
 async def shuffle_queue(interaction: discord.Interaction):
@@ -137,24 +165,38 @@ def message_queue(interaction: discord.Interaction, page):
     return msg_content
 
 
-async def buttons_on_message_queue(interaction: discord.Interaction, page):
+def create_view_queue(guild_id, page):
     view = discord.ui.View()
-    if page != 1:
-        button = discord.ui.Button(emoji=globals_var.reactions_queue[0])
+    button = discord.ui.Button(emoji=globals_var.reactions_queue[0])
 
-        async def button_callback(interact: discord.Interaction):
-            await get_queue(interact, page - 1)
+    async def button_callback(interact: discord.Interaction):
+        await get_queue(interact, page - 1, is_new=False)
 
-        button.callback = button_callback
-        view.add_item(button)
+    button.callback = button_callback
+    if page == 1:
+        button.disabled = True
+    view.add_item(button)
 
-    if globals_var.queues_musics[interaction.guild_id][page * 10:]:
-        button = discord.ui.Button(emoji=globals_var.reactions_queue[1])
+    button = discord.ui.Button(emoji=globals_var.reactions_queue[1])
 
-        async def button_callback(interact: discord.Interaction):
-            await get_queue(interact, page + 1)
+    async def button_callback(interact: discord.Interaction):
+        await get_queue(interact, page + 1, is_new=False)
 
-        button.callback = button_callback
-        view.add_item(button)
+    button.callback = button_callback
+    if not globals_var.queues_musics[guild_id][page * 10:]:
+        button.disabled = True
+    view.add_item(button)
+
+    return view
+
+
+async def create_buttons_on_message_queue(interaction: discord.Interaction, page):
+    view = create_view_queue(interaction.guild_id, page)
 
     await my_functions.edit(interaction, view=view)
+
+
+async def edit_buttons_on_message_queue(response: discord.InteractionMessage, guild_id, page):
+    view = create_view_queue(guild_id, page)
+
+    await my_functions.edit_response(response, view=view)
