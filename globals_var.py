@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from googleapiclient.discovery import build
 
 load_dotenv()
-print("prout")
 
 discord_key = os.getenv("DISCORD_KEY")
 client_bot = discord.Client(intents=discord.Intents.all())

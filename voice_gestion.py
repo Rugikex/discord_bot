@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import random
 
 import discord
 import youtube_dl
@@ -184,8 +185,8 @@ async def is_connected(interaction: discord.Interaction, channel):
         return False
     except discord.errors.ClientException:
         await my_functions.send(interaction, 'Already connected to {}.'
-                              .format(list(set(voice_channels)
-                                           .intersection(interaction.guild.voice_channels))[0].name))
+                                .format(list(set(voice_channels)
+                                             .intersection(interaction.guild.voice_channels))[0].name))
         return False
 
     print(f"Bot connects to {interaction.guild.name}.")
@@ -195,19 +196,19 @@ async def is_connected(interaction: discord.Interaction, channel):
 async def select_specific_search(interaction: discord.Interaction, number):
     music = [globals_var.specifics_searches[interaction.guild_id]['searches'][number]]
     shuffle = globals_var.specifics_searches[interaction.guild_id]['shuffle']
+    if 'position' in globals_var.specifics_searches[interaction.guild_id]:
+        position = globals_var.specifics_searches[interaction.guild_id]['position']
+    else:
+        position = None
 
     voice_client = await get_voice_client(interaction)
 
     await my_functions.delete_msg(await globals_var.specifics_searches[interaction.guild_id]['message'])
     globals_var.specifics_searches.pop(interaction.guild_id, None)
 
-    if voice_client.guild.id in globals_var.queues_musics:
-        globals_var.queues_musics[voice_client.guild.id].extend(music)
-        await my_functions.send(interaction, f"Added to queue: \"{music[0].title}\".")
-    else:
-        globals_var.queues_musics[voice_client.guild.id] = music
+    await queue_gestion.add_in_queue(interaction, music, position=position)
 
-    if shuffle:
+    if shuffle and not position:
         await queue_gestion.shuffle_queue(interaction)
 
     if not voice_client.is_playing():
@@ -224,7 +225,7 @@ async def create_button_select(number):
     return button
 
 
-async def play(interaction: discord.Interaction, content: str, shuffle=False):
+async def play(interaction: discord.Interaction, content: str, shuffle=False, position=None):
     if not await user_is_connected(interaction):
         return
 
@@ -236,22 +237,33 @@ async def play(interaction: discord.Interaction, content: str, shuffle=False):
         await my_functions.send(interaction, "I have been disconnected.")
         return
 
+    if (position and interaction not in globals_var.queues_musics) or \
+            (position and interaction in globals_var.queues_musics and
+             (position < 1 or position > len(globals_var.queues_musics[interaction.guild_id]))):
+        position = None
+
     if content.startswith("https://www.youtube.com/playlist?list=") or \
             (content.startswith("https://www.youtube.com/watch?v=") and "list=" in content):
         await my_functions.send(interaction, "Loading playlist...")
         musics = await globals_var.client_bot.loop.run_in_executor(None, youtube_requests.playlist_link, content)
         await my_functions.delete_msg(await interaction.original_response())
     elif content.startswith("https://www.youtube.com/watch?v="):
-        musics = youtube_requests.single_link(content)
+        await my_functions.send(interaction, "Loading music...")
+        musics = await globals_var.client_bot.loop.run_in_executor(None, youtube_requests.single_link, content)
+        await my_functions.delete_msg(await interaction.original_response())
     else:
+        if interaction.guild_id in globals_var.specifics_searches:
+            await my_functions.delete_msg(await globals_var.specifics_searches[interaction.guild_id]['message'])
+
         await my_functions.send(interaction, f"Searching for music related to {content}.")
-        searches = youtube_requests.specific_search(content)
+        searches = await globals_var.client_bot.loop.run_in_executor(None, youtube_requests.specific_search, content)
         if not searches:
             await my_functions.edit(interaction, content=f"No music found for {content}")
             return
 
         globals_var.specifics_searches[interaction.guild_id] = {'searches': searches,
                                                                 'shuffle': shuffle,
+                                                                'position': position,
                                                                 'user': interaction.user,
                                                                 'message': interaction.original_response()}
         msg_content = f'Select a track with buttons.\n\n'
@@ -270,20 +282,12 @@ async def play(interaction: discord.Interaction, content: str, shuffle=False):
         await my_functions.send(interaction, f'No audio could be found for {content}')
         return
 
-    if voice_client.guild.id in globals_var.queues_musics:
-        globals_var.queues_musics[voice_client.guild.id].extend(musics)
-        if len(musics) > 1:
-            await my_functions.send(interaction, f"Added {len(musics)} musics to queue.")
-        else:
-            await my_functions.send(interaction, f"Added to queue: \"{musics[0].title}\".")
-    else:
-        globals_var.queues_musics[voice_client.guild.id] = musics
-        if len(musics) - 1 > 1:
-            await my_functions.send(interaction, f"Added {len(musics)} musics to queue.")
-        elif len(musics) == 2:
-            await my_functions.send(interaction, f"Added to queue: \"{musics[1].title}\".")
+    if shuffle and position:
+        random.shuffle(musics)
 
-    if shuffle:
+    await queue_gestion.add_in_queue(interaction, musics, position)
+
+    if shuffle and not position:
         await queue_gestion.shuffle_queue(interaction)
 
     if not voice_client.is_playing():

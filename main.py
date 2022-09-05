@@ -15,7 +15,8 @@ async def msg_help(interaction: discord.Interaction):
               "`help`: Display this message.\n" \
               "`nowplaying`: Display the current music.\n" \
               "`pause`: Pause the current music.\n" \
-              "`play`: Play music with <youtube url/playlist or search terms>.\n" \
+              "`play`: Play <youtube url/playlist or search terms>.\n" \
+              "`play_next (shuffle)`:Play this music after the current one. (can shuffle new music added)\n" \
               "`play_shuffle`: Play music and shuffle queue.\n" \
               "`queue (number)`: Display the queue.\n" \
               "`remove begin (end)`: Remove `begin` music or [`begin`, `end`] musics.\n" \
@@ -43,6 +44,14 @@ async def display_current_music(interaction: discord.Interaction):
 
     msg_content += f" / {current_music[interaction.guild_id]['music'].duration}]"
     await my_functions.send(interaction, msg_content)
+
+
+def has_queue_music(interaction: discord.Interaction) -> bool:
+    return True if interaction.guild_id in globals_var.queues_musics else False
+
+
+def has_current_music(interaction: discord.Interaction) -> bool:
+    return True if interaction.guild_id in globals_var.current_music else False
 
 
 @client_bot.event
@@ -81,13 +90,13 @@ async def self(interaction: discord.Interaction):
 
 
 @tree.command(name="play", description="Play youtube url/playlist or search terms.")
-async def self(interaction: discord.Interaction, music: str):
-    await voice_gestion.play(interaction, music)
+async def self(interaction: discord.Interaction, music: str, position: int = None):
+    await voice_gestion.play(interaction, music, position=position)
 
 
-@tree.command(name="play_next", description="Play this music after the current one.")
-async def self(interaction: discord.Interaction, music: str):
-    await voice_gestion.play(interaction, music)
+@tree.command(name="play_next", description="Play this music after the current one. (can shuffle new music added)")
+async def self(interaction: discord.Interaction, music: str, shuffle: bool = False):
+    await voice_gestion.play(interaction, music, position=1, shuffle=shuffle)
 
 
 @tree.command(name="play_shuffle", description="Play and shuffle musics.")
@@ -153,8 +162,6 @@ async def self(interaction: discord.Interaction):
 
     button1.callback = button1_callback
     button2.callback = button2_callback
-
-    await interaction.response.send_message('The queue is cleared.')
 
     await interaction.response.send_message("C'est vrai que c'est delicieux !", view=view)
 

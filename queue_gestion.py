@@ -68,6 +68,30 @@ async def get_queue(interaction: discord.Interaction, page):
     globals_var.queues_message[interaction.guild_id] = interaction.original_response()
 
 
+async def add_in_queue(interaction: discord.Interaction, musics, position):
+    if position is not None:
+        for i in range(len(musics)):
+            globals_var.queues_musics[interaction.guild_id].insert(position - 1 + i, musics[i])
+        if len(musics) > 1:
+            await my_functions.send(interaction, f"Added {len(musics)} musics to {position} at "
+                                                 f"{position + len(musics)} in queue.")
+        else:
+            await my_functions.send(interaction, f"Added in position {position} to queue: \"{musics[0].title}\".")
+
+    elif interaction.guild_id in globals_var.queues_musics:
+        globals_var.queues_musics[interaction.guild_id].extend(musics)
+        if len(musics) > 1:
+            await my_functions.send(interaction, f"Added {len(musics)} musics to queue.")
+        else:
+            await my_functions.send(interaction, f"Added to queue: \"{musics[0].title}\".")
+    else:
+        globals_var.queues_musics[interaction.guild_id] = musics
+        if len(musics) - 1 > 1:
+            await my_functions.send(interaction, f"Added {len(musics)} musics to queue.")
+        elif len(musics) == 2:
+            await my_functions.send(interaction, f"Added to queue: \"{musics[1].title}\".")
+
+
 async def shuffle_queue(interaction: discord.Interaction):
     voice_client = await voice_gestion.get_voice_client(interaction)
     if voice_client is None:
@@ -106,7 +130,8 @@ def message_queue(interaction: discord.Interaction, page):
         msg_content += f" / {globals_var.current_music[interaction.guild_id]['music'].duration}]\n"
 
     for i in range(len(globals_var.queues_musics[interaction.guild_id][(page - 1) * 10:page * 10])):
-        msg_content += f'**{i + 1 + (page - 1) * 10}.** {globals_var.queues_musics[interaction.guild_id][i]}\n'
+        number = i + (page - 1) * 10
+        msg_content += f'**{number + 1}.** {globals_var.queues_musics[interaction.guild_id][number]}\n'
     msg_content += f'__Total musics:__ {len(globals_var.queues_musics[interaction.guild_id]) + 1}\n' \
                    f'__Total time:__ {get_queue_total_time(interaction.guild_id)}'
     return msg_content
