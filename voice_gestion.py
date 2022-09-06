@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import random
+import re
 
 import discord
 import youtube_dl
@@ -69,7 +70,7 @@ async def get_voice_client(interaction: discord.Interaction):
         return None
 
     guilds_id = list(map(lambda n: n.channel.guild.id, globals_var.client_bot.voice_clients))
-    if interaction.user.voice.channel.guild.id not in guilds_id:
+    if interaction.guild_id not in guilds_id:
         await my_functions.send(interaction, 'I\'m not connected to this server.')
         return None
 
@@ -242,15 +243,13 @@ async def play(interaction: discord.Interaction, content: str, shuffle=False, po
              (position < 1 or position > len(globals_var.queues_musics[interaction.guild_id]))):
         position = None
 
-    if content.startswith("https://www.youtube.com/playlist?list=") or \
-            (content.startswith("https://www.youtube.com/watch?v=") and "list=" in content):
+    if re.match("^((https://)?(www\.|music\.)?youtube\.com/playlist\?list=.+)", content) or \
+            re.match("^((https://)?www\.youtube\.com/watch\?v=.+&list=[^&]+)", content):
         await my_functions.send(interaction, "Loading playlist...")
-        musics = await globals_var.client_bot.loop.run_in_executor(None, youtube_requests.playlist_link, content)
-        await my_functions.delete_msg(await interaction.original_response())
-    elif content.startswith("https://www.youtube.com/watch?v="):
+        musics = await youtube_requests.playlist_link(interaction, content)
+    elif re.match("^((https://)?www\.youtube\.com/watch\?v=.+)", content):
         await my_functions.send(interaction, "Loading music...")
         musics = await globals_var.client_bot.loop.run_in_executor(None, youtube_requests.single_link, content)
-        await my_functions.delete_msg(await interaction.original_response())
     else:
         if interaction.guild_id in globals_var.specifics_searches:
             await my_functions.delete_msg(globals_var.specifics_searches[interaction.guild_id]['message'])
@@ -267,20 +266,36 @@ async def play(interaction: discord.Interaction, content: str, shuffle=False, po
                                                                 'user': interaction.user,
                                                                 'message': await interaction.original_response()}
         msg_content = f'Select a track with buttons.\n\n'
-        for i in range(len(globals_var.specifics_searches[interaction.guild.id]['searches'])):
-            msg_content += f'**{i + 1}:** {globals_var.specifics_searches[interaction.guild.id]["searches"][i]}\n'
+        for i in range(len(globals_var.specifics_searches[interaction.guild_id]['searches'])):
+            msg_content += f'**{i + 1}:** {globals_var.specifics_searches[interaction.guild_id]["searches"][i]}\n'
 
         view = discord.ui.View()
-        for i in range(len(globals_var.specifics_searches[interaction.guild.id]['searches'])):
+        for i in range(len(globals_var.specifics_searches[interaction.guild_id]['searches'])):
             view.add_item(await create_button_select(i, content))
 
         await my_functions.edit(interaction, content=msg_content, view=view)
 
         return
 
+    if not musics and \
+            re.match(
+                "^(https://)?www\.youtube\.com/watch\?v=[^&\n]+((&list=[^&\n]+)(&index=[^&\n]+)?|(&index=[^&\n]+)("
+                "&list=[^&\n]+)?)",
+                content):
+        match = re.match(
+            "^(https://)?(www\.youtube\.com/watch\?v=[^&\n]+)((&list=[^&\n]+)(&index=[^&\n]+)?|(&index=[^&\n]+)(&list=["
+            "^&\n]+)?)",
+            content)
+
+        await my_functions.edit(interaction, "No playlist found, loading music...")
+        musics = await globals_var.client_bot.loop.run_in_executor(None, youtube_requests.single_link,
+                                                                   match[match.lastindex - 1])
+
     if not musics:
-        await my_functions.send(interaction, f'No audio could be found for {content}')
+        await my_functions.edit(interaction, f'No audio found for "{content}".')
         return
+
+    await my_functions.delete_msg(await interaction.original_response())
 
     if shuffle and position:
         random.shuffle(musics)
@@ -290,5 +305,5 @@ async def play(interaction: discord.Interaction, content: str, shuffle=False, po
     if shuffle and not position:
         await queue_gestion.shuffle_queue(interaction)
 
-    if not voice_client.is_playing():
+    if voice_client.source is None or interaction.guild_id not in globals_var.current_music:
         await next_music(interaction)

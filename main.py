@@ -47,14 +47,6 @@ async def display_current_music(interaction: discord.Interaction):
     await my_functions.send(interaction, msg_content)
 
 
-def has_queue_music(interaction: discord.Interaction) -> bool:
-    return True if interaction.guild_id in globals_var.queues_musics else False
-
-
-def has_current_music(interaction: discord.Interaction) -> bool:
-    return True if interaction.guild_id in globals_var.current_music else False
-
-
 @client_bot.event
 async def on_ready():
     guilds = []

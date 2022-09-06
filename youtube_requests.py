@@ -1,11 +1,13 @@
 import datetime
 
+import discord
 from googleapiclient.errors import HttpError
 import isodate
 import pytube
 import pytube.exceptions
 
 import globals_var
+import my_functions
 from class_music_item import MusicItem
 
 
@@ -48,15 +50,18 @@ def single_link(link):
     return [create_music_item(obj)]
 
 
-def playlist_link(link):
+async def playlist_link(interaction: discord.Interaction, link):
     urls = []
     # pytube.Playlist(link).video_urls returns pytube.helpers.DeferredGeneratorList that don't support slicing
-    urls.extend(pytube.Playlist(link).video_urls)
+    playlist = await globals_var.client_bot.loop.run_in_executor(None, pytube.Playlist, link)
+    pytube_urls = playlist.video_urls
+    await globals_var.client_bot.loop.run_in_executor(None, urls.extend, pytube_urls)
+    numbers_new_musics = len(urls)
     res = []
     while urls:
-        print(f"Remaining musics: {len(urls)}")
+        await my_functions.edit(interaction, content=f"Loading playlist: {len(res)}/{numbers_new_musics}.")
         video_ids = list(map(lambda n: n.split("https://www.youtube.com/watch?v=", 1)[1], urls[:50]))
-        res.extend(create_music_items(video_ids))
+        res.extend(await globals_var.client_bot.loop.run_in_executor(None, create_music_items, video_ids))
         urls = urls[50:]
 
     return res
@@ -64,7 +69,7 @@ def playlist_link(link):
 
 # Faster than playlist_link but costs twice in YouTube API units
 def playlist_link2(link):
-    playlist_id = link.split("list=", 1)[1].split("&index=", 1)[0]
+    playlist_id = link.split("list=", 1)[1].split("&", 1)[0]
     request_id = globals_var.youtube.playlistItems().list(
         part="contentDetails",
         maxResults=50,

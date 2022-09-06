@@ -63,7 +63,7 @@ async def get_queue(interaction: discord.Interaction, page, is_new=True):
     if voice_client is None:
         return
 
-    if interaction.guild_id not in globals_var.queues_musics:
+    if interaction.guild_id not in globals_var.queues_musics or not globals_var.queues_musics[interaction.guild_id]:
         await my_functions.send(interaction, "Queue is empty!")
         return
 
@@ -145,7 +145,7 @@ async def clear_queue(interaction: discord.Interaction):
 def message_queue(interaction: discord.Interaction, page):
     max_page = max(math.ceil(len(globals_var.queues_musics[interaction.guild_id]) / 10), 1)
     msg_content = f'Queue list (page {page}/{max_page}):\n'
-    if page == 1:
+    if page == 1 and interaction.guild_id in globals_var.current_music:
         msg_content += f'**Now.** {globals_var.current_music[interaction.guild_id]["music"].title} ['
         if globals_var.current_music[interaction.guild_id]['is_paused']:
             msg_content += f"{str(globals_var.current_music[interaction.guild_id]['time_spent']).split('.')[0]}"
