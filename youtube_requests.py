@@ -64,6 +64,7 @@ async def playlist_link(interaction: discord.Interaction, link):
         res.extend(await globals_var.client_bot.loop.run_in_executor(None, create_music_items, video_ids))
         urls = urls[50:]
 
+    await my_functions.edit(interaction, content=f"Loading playlist: {len(res)}/{numbers_new_musics}.")
     return res
 
 

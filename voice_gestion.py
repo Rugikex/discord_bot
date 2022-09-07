@@ -257,7 +257,7 @@ async def play(interaction: discord.Interaction, content: str, shuffle=False, po
         await my_functions.send(interaction, f"Searching for music related to {content}.")
         searches = await globals_var.client_bot.loop.run_in_executor(None, youtube_requests.specific_search, content)
         if not searches:
-            await my_functions.edit(interaction, content=f"No music found for {content}")
+            await my_functions.edit(interaction, content=f"No music found for \"{content}\".")
             return
 
         globals_var.specifics_searches[interaction.guild_id] = {'searches': searches,
