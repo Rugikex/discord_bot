@@ -50,7 +50,6 @@ async def remove_musics(interaction: discord.Interaction, begin, end):
     for i in range(begin, end + 1):
         if globals_var.queues_musics[interaction.guild_id]:
             pop = globals_var.queues_musics[interaction.guild_id].pop(begin - 1)
-            print("music pop:", pop)
             counter += 1
         else:
             break
@@ -59,7 +58,7 @@ async def remove_musics(interaction: discord.Interaction, begin, end):
 
 
 async def get_queue(interaction: discord.Interaction, page, is_new=True):
-    voice_client = await voice_gestion.check_voice_client(interaction)
+    voice_client = await voice_gestion.get_voice_client(interaction, interaction.user.voice.channel)
     if voice_client is None:
         return
 
@@ -121,7 +120,7 @@ async def add_in_queue(interaction: discord.Interaction, musics, position, conte
 
 
 async def shuffle_queue(interaction: discord.Interaction):
-    voice_client = await voice_gestion.get_voice_client(interaction)
+    voice_client = await voice_gestion.get_voice_client(interaction, interaction.user.voice.channel)
     if voice_client is None:
         return
 

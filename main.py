@@ -31,6 +31,7 @@ async def msg_help(interaction: discord.Interaction):
 
 async def display_current_music(interaction: discord.Interaction):
     if interaction.guild_id not in current_music:
+        await my_functions.send(interaction, "No music.")
         return
 
     msg_content = f"Playing {current_music[interaction.guild_id]['music'].title}\n[Time] ["

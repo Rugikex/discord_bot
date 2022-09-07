@@ -1,0 +1,8 @@
+discord.py
+ffmpeg-python
+google-api-python-client
+isodate
+PyNaCl
+python-dotenv
+pytube
+youtube-dl

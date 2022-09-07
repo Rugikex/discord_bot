@@ -31,8 +31,8 @@ async def user_is_connected(interaction: discord.Interaction):
     return True
 
 
-async def next_music(interaction: discord.Interaction):
-    voice_client = await get_voice_client(interaction)
+async def next_music(interaction: discord.Interaction, channel):
+    voice_client = await get_voice_client(interaction, channel, check_user=False)
 
     if globals_var.queues_musics[interaction.guild_id] and voice_client is not None:
         new_music = globals_var.queues_musics[interaction.guild_id].pop(0)
@@ -45,7 +45,7 @@ async def next_music(interaction: discord.Interaction):
                                        before_options=FFMPEG_OPTIONS['before_options'],
                                        options=FFMPEG_OPTIONS['options'])
 
-        voice_client.play(audio, after=lambda x=None: asyncio.run_coroutine_threadsafe(next_music(interaction),
+        voice_client.play(audio, after=lambda x=None: asyncio.run_coroutine_threadsafe(next_music(interaction, channel),
                                                                                        globals_var.client_bot.loop))
 
         if interaction.guild_id in current_music:
@@ -65,8 +65,8 @@ async def next_music(interaction: discord.Interaction):
         current_music.pop(interaction.guild_id, None)
 
 
-async def get_voice_client(interaction: discord.Interaction):
-    if not await user_is_connected(interaction):
+async def get_voice_client(interaction: discord.Interaction, channel, check_user=True):
+    if check_user and not await user_is_connected(interaction):
         return None
 
     guilds_id = list(map(lambda n: n.channel.guild.id, globals_var.client_bot.voice_clients))
@@ -75,13 +75,13 @@ async def get_voice_client(interaction: discord.Interaction):
         return None
 
     channels = list(map(lambda n: n.channel, globals_var.client_bot.voice_clients))
-    if interaction.user.voice.channel not in channels:
+    if channel not in channels:
         await my_functions.send(interaction, 'We are in different voice channels.')
         return None
 
     for voice_client in globals_var.client_bot.voice_clients:
         voice_client: discord.VoiceClient
-        if voice_client.channel != interaction.user.voice.channel:
+        if voice_client.channel != channel:
             continue
         return voice_client
 
@@ -89,7 +89,7 @@ async def get_voice_client(interaction: discord.Interaction):
 
 
 async def check_voice_client(interaction: discord.Interaction):
-    voice_client = await get_voice_client(interaction)
+    voice_client = await get_voice_client(interaction, interaction.user.voice.channel)
     if voice_client is None:
         return None
 
@@ -162,16 +162,17 @@ async def stop_music(interaction: discord.Interaction):
 
 
 async def disconnect(interaction: discord.Interaction):
-    voice_client = await get_voice_client(interaction)
+    voice_client = await get_voice_client(interaction, interaction.user.voice.channel)
     if voice_client is None:
         return
 
     globals_var.queues_musics.pop(interaction.guild_id, None)
     voice_client.stop()
-    await voice_client.disconnect()
 
     await my_functions.send(interaction, 'The bot is disconnected.')
     print(f"Bot disconnects to {voice_client.guild.name}.")
+
+    await voice_client.disconnect()
 
 
 async def is_connected(interaction: discord.Interaction, channel):
@@ -202,7 +203,7 @@ async def select_specific_search(interaction: discord.Interaction, number, conte
     else:
         position = None
 
-    voice_client = await get_voice_client(interaction)
+    voice_client = await get_voice_client(interaction, interaction.user.voice.channel)
 
     await my_functions.delete_msg(globals_var.specifics_searches[interaction.guild_id]['message'])
     globals_var.specifics_searches.pop(interaction.guild_id, None)
@@ -213,7 +214,7 @@ async def select_specific_search(interaction: discord.Interaction, number, conte
         await queue_gestion.shuffle_queue(interaction)
 
     if not voice_client.is_playing():
-        await next_music(interaction)
+        await next_music(interaction, interaction.user.voice.channel)
 
 
 async def create_button_select(number, content):
@@ -233,7 +234,7 @@ async def play(interaction: discord.Interaction, content: str, shuffle=False, po
     if not await is_connected(interaction, interaction.user.voice.channel):
         return
 
-    voice_client = await get_voice_client(interaction)
+    voice_client = await get_voice_client(interaction, interaction.user.voice.channel)
     if voice_client is None:
         await my_functions.send(interaction, "I have been disconnected.")
         return
@@ -306,4 +307,4 @@ async def play(interaction: discord.Interaction, content: str, shuffle=False, po
         await queue_gestion.shuffle_queue(interaction)
 
     if voice_client.source is None or interaction.guild_id not in globals_var.current_music:
-        await next_music(interaction)
+        await next_music(interaction, interaction.user.voice.channel)
