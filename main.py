@@ -18,6 +18,7 @@ async def msg_help(interaction: discord.Interaction):
               "`nowplaying`: Display the current music.\n" \
               "`pause`: Pause the current music.\n" \
               "`play`: Play <youtube url/playlist or search terms>.\n" \
+              "`play_default`: Play default musics of this server.\n" \
               "`play_next (shuffle)`:Play this music after the current one. (can shuffle new music added)\n" \
               "`play_shuffle`: Play music and shuffle queue.\n" \
               "`queue (number)`: Display the queue.\n" \
@@ -56,6 +57,17 @@ async def on_ready():
         guilds.append(guild.name)
     await tree.sync()
     print(f'Logged in as {client_bot.user} to {guilds}.')
+
+
+@client_bot.event
+async def on_voice_state_update(member, before, after):
+    if member == client_bot.user and before is not None and after is not None:
+        for voice_client in client_bot.voice_clients:
+            voice_client: discord.VoiceClient
+            if voice_client.channel.guild != member.guild:
+                continue
+
+            voice_client.resume()
 
 
 @tree.command(name="clear", description="Clear the queue.")

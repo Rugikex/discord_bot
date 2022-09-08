@@ -31,11 +31,11 @@ async def user_is_connected(interaction: discord.Interaction):
     return True
 
 
-async def next_music(interaction: discord.Interaction, channel):
-    voice_client = await get_voice_client(interaction, channel, check_user=False)
+async def next_music(interaction: discord.Interaction, channel, guild_id):
+    voice_client = await get_voice_client(interaction, channel, check=False)
 
-    if globals_var.queues_musics[interaction.guild_id] and voice_client is not None:
-        new_music = globals_var.queues_musics[interaction.guild_id].pop(0)
+    if globals_var.queues_musics[guild_id] and voice_client is not None:
+        new_music = globals_var.queues_musics[guild_id].pop(0)
 
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(new_music.link, download=False)
@@ -45,28 +45,35 @@ async def next_music(interaction: discord.Interaction, channel):
                                        before_options=FFMPEG_OPTIONS['before_options'],
                                        options=FFMPEG_OPTIONS['options'])
 
-        voice_client.play(audio, after=lambda x=None: asyncio.run_coroutine_threadsafe(next_music(interaction, channel),
-                                                                                       globals_var.client_bot.loop))
+        voice_client.play(audio, after=lambda x=None: asyncio.run_coroutine_threadsafe(
+            next_music(interaction, channel, guild_id),
+            globals_var.client_bot.loop
+        ))
 
         if interaction.guild_id in current_music:
-            await my_functions.delete_msg(current_music[interaction.guild_id]['message'])
+            await my_functions.delete_msg(current_music[guild_id]['message'])
 
-        current_music[interaction.guild_id] = {'start_time': datetime.datetime.now(),
-                                               'time_spent': datetime.timedelta(seconds=0),
-                                               'music': new_music,
-                                               'is_paused': False,
-                                               'message': None}
+        current_music[guild_id] = {'start_time': datetime.datetime.now(),
+                                   'time_spent': datetime.timedelta(seconds=0),
+                                   'music': new_music,
+                                   'is_paused': False,
+                                   'message': None}
         message = await my_functions.send_by_channel(interaction.channel, f'Now playing {new_music}.')
-        current_music[interaction.guild_id]['message'] = message
+        current_music[guild_id]['message'] = message
 
     else:
-        globals_var.queues_musics.pop(interaction.guild_id, None)
-        await my_functions.delete_msg(current_music[interaction.guild_id]['message'])
-        current_music.pop(interaction.guild_id, None)
+        if guild_id in globals_var.queues_musics:
+            globals_var.queues_musics.pop(guild_id, None)
+        if guild_id in current_music:
+            await my_functions.delete_msg(current_music[guild_id]['message'])
+            current_music.pop(guild_id, None)
+        if guild_id in globals_var.queues_message:
+            await my_functions.delete_msg(globals_var.queues_message[guild_id])
+            globals_var.queues_message.pop(guild_id, None)
 
 
-async def get_voice_client(interaction: discord.Interaction, channel, check_user=True):
-    if check_user and not await user_is_connected(interaction):
+async def get_voice_client(interaction: discord.Interaction, channel, check=True):
+    if check and not await user_is_connected(interaction):
         return None
 
     guilds_id = list(map(lambda n: n.channel.guild.id, globals_var.client_bot.voice_clients))
@@ -75,13 +82,13 @@ async def get_voice_client(interaction: discord.Interaction, channel, check_user
         return None
 
     channels = list(map(lambda n: n.channel, globals_var.client_bot.voice_clients))
-    if channel not in channels:
+    if check and channel not in channels:
         await my_functions.send(interaction, 'We are in different voice channels.')
         return None
 
     for voice_client in globals_var.client_bot.voice_clients:
         voice_client: discord.VoiceClient
-        if voice_client.channel != channel:
+        if voice_client.channel.guild != channel.guild:
             continue
         return voice_client
 
@@ -204,6 +211,8 @@ async def select_specific_search(interaction: discord.Interaction, number, conte
         position = None
 
     voice_client = await get_voice_client(interaction, interaction.user.voice.channel)
+    if voice_client is None:
+        return
 
     await my_functions.delete_msg(globals_var.specifics_searches[interaction.guild_id]['message'])
     globals_var.specifics_searches.pop(interaction.guild_id, None)
@@ -214,7 +223,7 @@ async def select_specific_search(interaction: discord.Interaction, number, conte
         await queue_gestion.shuffle_queue(interaction)
 
     if not voice_client.is_playing():
-        await next_music(interaction, interaction.user.voice.channel)
+        await next_music(interaction, interaction.user.voice.channel, interaction.guild_id)
 
 
 async def create_button_select(number, content):
@@ -307,4 +316,4 @@ async def play(interaction: discord.Interaction, content: str, shuffle=False, po
         await queue_gestion.shuffle_queue(interaction)
 
     if voice_client.source is None or interaction.guild_id not in globals_var.current_music:
-        await next_music(interaction, interaction.user.voice.channel)
+        await next_music(interaction, voice_client.channel, interaction.guild_id)
