@@ -4,6 +4,7 @@ import discord
 
 import globals_var
 import my_functions
+import secret_list
 from globals_var import current_music, client_bot, tree
 import queue_gestion
 import voice_gestion
@@ -91,6 +92,15 @@ async def self(interaction: discord.Interaction):
 @tree.command(name="play", description="Play youtube url/playlist or search terms.")
 async def self(interaction: discord.Interaction, music: str, position: int = None):
     await voice_gestion.play(interaction, music, position=position)
+
+
+@tree.command(name="play_default", description="Play default musics of this server.")
+async def self(interaction: discord.Interaction, position: int = None):
+    if interaction.guild_id not in secret_list.default_musics:
+        await my_functions.send(interaction, "No default music for this server")
+        return
+
+    await voice_gestion.play(interaction, secret_list.default_musics[interaction.guild_id], position=position)
 
 
 @tree.command(name="play_next", description="Play this music after the current one. (can shuffle new music added)")
