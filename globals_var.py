@@ -1,8 +1,11 @@
 import os
+import datetime
 
 import discord
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
+
+from class_music_item import MusicItem
 
 load_dotenv()
 
@@ -12,6 +15,8 @@ tree = discord.app_commands.CommandTree(client_bot)
 
 youtube_key = os.getenv("YOUTUBE_KEY")
 youtube = build("youtube", "v3", developerKey=youtube_key)
+
+wololo = MusicItem("youtube", "Welcome", datetime.timedelta(seconds=2), "https://www.youtube.com/watch?v=hSU0Z3_466s")
 
 """Can be change
 Store by guild id

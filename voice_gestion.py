@@ -198,6 +198,9 @@ async def is_connected(interaction: discord.Interaction, channel):
                                              .intersection(interaction.guild.voice_channels))[0].name))
         return False
 
+    globals_var.queues_musics[interaction.guild_id] = [globals_var.wololo]
+    await next_music(interaction, channel, interaction.guild_id)
+
     print(f"Bot connects to {interaction.guild.name}.")
     return True
 
@@ -315,5 +318,6 @@ async def play(interaction: discord.Interaction, content: str, shuffle=False, po
     if shuffle and not position:
         await queue_gestion.shuffle_queue(interaction)
 
+    voice_client = discord.utils.get(globals_var.client_bot.voice_clients, guild=interaction.guild)
     if voice_client.source is None or interaction.guild_id not in globals_var.current_music:
         await next_music(interaction, voice_client.channel, interaction.guild_id)
