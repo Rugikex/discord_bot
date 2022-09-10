@@ -5,4 +5,4 @@ isodate
 PyNaCl
 python-dotenv
 pytube
-youtube-dl
+yt-dlp

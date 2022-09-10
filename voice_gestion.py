@@ -4,7 +4,7 @@ import random
 import re
 
 import discord
-import youtube_dl
+import yt_dlp
 
 import globals_var
 import my_functions
@@ -13,7 +13,10 @@ import queue_gestion
 import youtube_requests
 
 ydl_opts = {
-    'format': 'bestaudio/best',
+    'audio-quality': 0,
+    'extract-audio': True,
+    'format': 'bestaudio',
+    'fps': None,
     'youtube_include_dash_manifest': False,
     'quiet': True
 }
@@ -37,9 +40,21 @@ async def next_music(interaction: discord.Interaction, channel, guild_id):
     if globals_var.queues_musics[guild_id] and voice_client is not None:
         new_music = globals_var.queues_musics[guild_id].pop(0)
 
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(new_music.link, download=False)
-            url = info['formats'][0]['url']
+
+        url = None
+        for info_format in info['formats']:
+            if 'asr' not in info_format:
+                continue
+            url = info_format['url']
+            break
+
+        if url is None:
+            await my_functions.send_by_channel(interaction.channel, f'Can\'t find stream for listening "{new_music}".\n'
+                                                                    f'The music is skipped.')
+            await next_music(interaction, channel, guild_id)
+            return
 
         audio = discord.FFmpegPCMAudio(url,
                                        before_options=FFMPEG_OPTIONS['before_options'],
@@ -60,7 +75,6 @@ async def next_music(interaction: discord.Interaction, channel, guild_id):
                                    'message': None}
         message = await my_functions.send_by_channel(interaction.channel, f'Now playing {new_music}.')
         current_music[guild_id]['message'] = message
-
     else:
         if guild_id in globals_var.queues_musics:
             globals_var.queues_musics.pop(guild_id, None)
