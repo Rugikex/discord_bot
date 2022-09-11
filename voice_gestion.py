@@ -6,6 +6,7 @@ import re
 import discord
 import yt_dlp
 
+from custom_classes import AudioSourceTracked
 import globals_var
 import my_functions
 from globals_var import current_music
@@ -56,9 +57,11 @@ async def next_music(interaction: discord.Interaction, channel, guild_id):
             await next_music(interaction, channel, guild_id)
             return
 
-        audio = discord.FFmpegPCMAudio(url,
-                                       before_options=FFMPEG_OPTIONS['before_options'],
-                                       options=FFMPEG_OPTIONS['options'])
+        raw_audio = discord.FFmpegPCMAudio(url,
+                                           before_options=FFMPEG_OPTIONS['before_options'],
+                                           options=FFMPEG_OPTIONS['options'])
+
+        audio = AudioSourceTracked(raw_audio)
 
         voice_client.play(audio, after=lambda x=None: asyncio.run_coroutine_threadsafe(
             next_music(interaction, channel, guild_id),
@@ -68,11 +71,9 @@ async def next_music(interaction: discord.Interaction, channel, guild_id):
         if interaction.guild_id in current_music:
             await my_functions.delete_msg(current_music[guild_id]['message'])
 
-        current_music[guild_id] = {'start_time': datetime.datetime.now(),
-                                   'time_spent': datetime.timedelta(seconds=0),
-                                   'music': new_music,
-                                   'is_paused': False,
-                                   'message': None}
+        current_music[guild_id] = {'music': new_music,
+                                   'message': None,
+                                   'audio': audio}
         message = await my_functions.send_by_channel(interaction.channel, f'Now playing {new_music}.')
         current_music[guild_id]['message'] = message
     else:
@@ -132,10 +133,6 @@ async def pause_music(interaction: discord.Interaction):
 
     voice_client.pause()
 
-    current_music[interaction.guild_id]['is_paused'] = True
-    current_music[interaction.guild_id]['time_spent'] += datetime.datetime.now() - \
-                                                         current_music[interaction.guild_id]['start_time']
-
     await my_functions.send(interaction, 'The music is paused.')
 
 
@@ -149,8 +146,6 @@ async def resume_music(interaction: discord.Interaction):
         return
 
     voice_client.resume()
-    current_music[interaction.guild_id]['is_paused'] = False
-    current_music[interaction.guild_id]['start_time'] = datetime.datetime.now()
 
     await my_functions.send(interaction, 'The music resumes.')
 

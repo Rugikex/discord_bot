@@ -8,7 +8,7 @@ import pytube.exceptions
 
 import globals_var
 import my_functions
-from class_music_item import MusicItem
+from custom_classes import MusicItem
 
 
 def create_music_item(yt_obj):

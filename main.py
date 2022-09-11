@@ -36,17 +36,10 @@ async def display_current_music(interaction: discord.Interaction):
         await my_functions.send(interaction, "No music.")
         return
 
-    msg_content = f"Playing {current_music[interaction.guild_id]['music'].title}\n[Time] ["
+    msg_content = f"Playing {current_music[interaction.guild_id]['music'].title}\n[Time] [" \
+                  f"{current_music[interaction.guild_id]['audio'].progress_str}" \
+                  f" / {current_music[interaction.guild_id]['music'].duration}]"
 
-    if current_music[interaction.guild_id]['is_paused']:
-        msg_content += f"{str(current_music[interaction.guild_id]['time_spent']).split('.')[0]}"
-    else:
-        duration = datetime.datetime.now() + current_music[interaction.guild_id]['time_spent'] \
-                   - current_music[interaction.guild_id]['start_time']
-        duration_without_ms = str(duration).split('.')[0]
-        msg_content += f"{duration_without_ms}"
-
-    msg_content += f" / {current_music[interaction.guild_id]['music'].duration}]"
     await my_functions.send(interaction, msg_content)
 
 
@@ -67,10 +60,17 @@ async def on_voice_state_update(member, before, after):
 
     if member == client_bot.user and before.channel and after.channel and len(after.channel.members) > 1:
         voice_client.resume()
+        return
+
+    if member != client_bot.user and before.channel and client_bot.user in before.channel.members \
+            and len(before.channel.members) == 1:
+        voice_client.pause()
+        return
 
     if member != client_bot.user and after.channel \
             and client_bot.user in after.channel.members and len(after.channel.members) == 2:
         voice_client.resume()
+        return
 
 
 @tree.command(name="clear", description="Clear the queue.")

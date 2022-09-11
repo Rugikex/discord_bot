@@ -15,12 +15,8 @@ def get_queue_total_time(guild_id):
         res += item.duration
 
     res += globals_var.current_music[guild_id]['music'].duration
-    if globals_var.current_music[guild_id]['is_paused']:
-        res -= globals_var.current_music[guild_id]['time_spent']
-    else:
-        duration = datetime.datetime.now() + globals_var.current_music[guild_id]['time_spent'] \
-                   - globals_var.current_music[guild_id]['start_time']
-        res -= duration
+    res -= globals_var.current_music[guild_id]['audio'].progress_datetime
+
     return res - datetime.timedelta(microseconds=res.microseconds)
 
 
@@ -62,7 +58,7 @@ async def get_queue(interaction: discord.Interaction, page, is_new=True):
     if voice_client is None:
         return
 
-    if interaction.guild_id not in globals_var.queues_musics or not globals_var.queues_musics[interaction.guild_id]:
+    if interaction.guild_id not in globals_var.queues_musics:
         await my_functions.send(interaction, "Queue is empty!")
         return
 
@@ -142,24 +138,22 @@ async def clear_queue(interaction: discord.Interaction):
 
 
 def message_queue(interaction: discord.Interaction, page):
+    number_musics = 1
     max_page = max(math.ceil(len(globals_var.queues_musics[interaction.guild_id]) / 10), 1)
     msg_content = f'Queue list (page {page}/{max_page}):\n'
     if page == 1 and interaction.guild_id in globals_var.current_music:
         msg_content += f'**Now.** {globals_var.current_music[interaction.guild_id]["music"].title} ['
-        if globals_var.current_music[interaction.guild_id]['is_paused']:
-            msg_content += f"{str(globals_var.current_music[interaction.guild_id]['time_spent']).split('.')[0]}"
-        else:
-            duration = datetime.datetime.now() + globals_var.current_music[interaction.guild_id]['time_spent'] \
-                       - globals_var.current_music[interaction.guild_id]['start_time']
-            duration_without_ms = str(duration).split('.')[0]
-            msg_content += f"{duration_without_ms}"
+        msg_content += globals_var.current_music[interaction.guild_id]['audio'].progress_str
 
         msg_content += f" / {globals_var.current_music[interaction.guild_id]['music'].duration}]\n"
 
-    for i in range(len(globals_var.queues_musics[interaction.guild_id][(page - 1) * 10:page * 10])):
-        number = i + (page - 1) * 10
-        msg_content += f'**{number + 1}.** {globals_var.queues_musics[interaction.guild_id][number]}\n'
-    msg_content += f'__Total musics:__ {len(globals_var.queues_musics[interaction.guild_id]) + 1}\n' \
+    if interaction.guild_id in globals_var.queues_musics:
+        for i in range(len(globals_var.queues_musics[interaction.guild_id][(page - 1) * 10:page * 10])):
+            number = i + (page - 1) * 10
+            msg_content += f'**{number + 1}.** {globals_var.queues_musics[interaction.guild_id][number]}\n'
+        number_musics += len(globals_var.queues_musics[interaction.guild_id])
+
+    msg_content += f'__Total musics:__ {number_musics}\n' \
                    f'__Total time:__ {get_queue_total_time(interaction.guild_id)}'
     return msg_content
 

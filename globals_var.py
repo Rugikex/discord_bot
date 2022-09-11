@@ -5,7 +5,7 @@ import discord
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 
-from class_music_item import MusicItem
+from custom_classes import MusicItem
 
 load_dotenv()
 
