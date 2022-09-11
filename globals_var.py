@@ -18,7 +18,7 @@ youtube = build("youtube", "v3", developerKey=youtube_key)
 
 wololo = MusicItem("youtube", "Welcome", datetime.timedelta(seconds=2), "https://www.youtube.com/watch?v=hSU0Z3_466s")
 
-"""Can be change
+"""
 Store by guild id
 Contains:
     'start_time': date the music started or restart after pause,
@@ -28,6 +28,7 @@ Contains:
     'message': message that display which music is currently playing
 """
 current_music = {}
+
 """
 Store by guild id
 Contains:
@@ -37,9 +38,10 @@ Contains:
     'message': message that shows searches
 """
 specifics_searches = {}
+
 """
 Store by guild id
-Contains a list of MusicItem(s) if users request multiples musics
+Contains a list of MusicItem(s)
 """
 queues_musics = {}
 queues_message = {}

@@ -38,7 +38,7 @@ async def edit_response(response: discord.InteractionMessage, content=discord.ut
 async def delete_msg(message):
     try:
         await message.delete()
-    except discord.errors.NotFound:
+    except (discord.errors.NotFound, discord.errors.HTTPException):
         pass
 
 

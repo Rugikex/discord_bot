@@ -61,13 +61,16 @@ async def on_ready():
 
 @client_bot.event
 async def on_voice_state_update(member, before, after):
-    if member == client_bot.user and before is not None and after is not None:
-        for voice_client in client_bot.voice_clients:
-            voice_client: discord.VoiceClient
-            if voice_client.channel.guild != member.guild:
-                continue
+    voice_client: discord.VoiceClient = discord.utils.get(client_bot.voice_clients, guild=member.guild)
+    if not voice_client:
+        return
 
-            voice_client.resume()
+    if member == client_bot.user and before.channel and after.channel and len(after.channel.members) > 1:
+        voice_client.resume()
+
+    if member != client_bot.user and after.channel \
+            and client_bot.user in after.channel.members and len(after.channel.members) == 2:
+        voice_client.resume()
 
 
 @tree.command(name="clear", description="Clear the queue.")
