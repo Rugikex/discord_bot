@@ -21,11 +21,9 @@ wololo = MusicItem("youtube", "Welcome", datetime.timedelta(seconds=2), "https:/
 """
 Store by guild id
 Contains:
-    'start_time': date the music started or restart after pause,
-    'time_spent': duration spent after the last time the music was paused,
     'music': music currently playing,
-    'is_paused': check if the music is paused,
-    'message': message that display which music is currently playing
+    'message': message that display which music is currently playing,
+    'audio': audio currently playing
 """
 current_music = {}
 

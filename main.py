@@ -58,8 +58,11 @@ async def on_voice_state_update(member, before, after):
     if not voice_client:
         return
 
-    if member == client_bot.user and before.channel and after.channel and len(after.channel.members) > 1:
-        voice_client.resume()
+    if member == client_bot.user and before.channel and after.channel:
+        if len(after.channel.members) == 1:
+            voice_client.pause()
+        else:
+            voice_client.resume()
         return
 
     if member != client_bot.user and before.channel and client_bot.user in before.channel.members \
