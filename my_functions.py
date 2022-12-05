@@ -1,5 +1,7 @@
 import discord
 
+import globals_var
+
 
 async def send_by_channel(channel, content):
     if not channel:
@@ -42,6 +44,13 @@ async def delete_msg(message):
         pass
 
 
+async def disconnect_bot(voice_client, guild_id):
+    globals_var.queues_musics.pop(guild_id, None)
+    voice_client.stop()
+    await voice_client.disconnect()
+
+
+# Not use
 async def add_reaction(interaction: discord.Interaction, reaction):
     try:
         interaction_message = await interaction.original_response()

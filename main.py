@@ -1,5 +1,3 @@
-import datetime
-
 import discord
 
 import globals_var
@@ -60,19 +58,14 @@ async def on_voice_state_update(member, before, after):
 
     if member == client_bot.user and before.channel and after.channel:
         if len(after.channel.members) == 1:
-            voice_client.pause()
+            await my_functions.disconnect_bot(voice_client, member.guild.id)
         else:
             voice_client.resume()
         return
 
     if member != client_bot.user and before.channel and client_bot.user in before.channel.members \
             and len(before.channel.members) == 1:
-        voice_client.pause()
-        return
-
-    if member != client_bot.user and after.channel \
-            and client_bot.user in after.channel.members and len(after.channel.members) == 2:
-        voice_client.resume()
+        await my_functions.disconnect_bot(voice_client, member.guild.id)
         return
 
 
@@ -113,12 +106,13 @@ async def self(interaction: discord.Interaction, music: str, position: int = Non
 
 
 @tree.command(name="play_default", description="Play default musics of this server.")
-async def self(interaction: discord.Interaction, position: int = None):
+async def self(interaction: discord.Interaction, shuffle: bool = False, position: int = None):
     if interaction.guild_id not in secret_list.default_musics:
         await my_functions.send(interaction, "No default music for this server")
         return
 
-    await voice_gestion.play(interaction, secret_list.default_musics[interaction.guild_id], position=position)
+    await voice_gestion.play(interaction, secret_list.default_musics[interaction.guild_id], shuffle=shuffle,
+                             position=position)
 
 
 @tree.command(name="play_next", description="Play this music after the current one. (can shuffle new music added)")

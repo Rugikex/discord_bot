@@ -50,24 +50,30 @@ def single_link(link):
     return [create_music_item(obj)]
 
 
+async def waiting_queue():
+    return
+
+
 async def playlist_link(interaction: discord.Interaction, link):
-    urls = []
-    # pytube.Playlist(link).video_urls returns pytube.helpers.DeferredGeneratorList that don't support slicing
-    playlist = await globals_var.client_bot.loop.run_in_executor(None, pytube.Playlist, link)
-    pytube_urls = playlist.video_urls
-    await globals_var.client_bot.loop.run_in_executor(None, urls.extend, pytube_urls)
-    numbers_new_musics = len(urls)
-    res = []
-    while urls:
+    if len(globals_var.queue_request_youtube) == 0:
+        urls = []
+        # pytube.Playlist(link).video_urls returns pytube.helpers.DeferredGeneratorList that don't support slicing
+        playlist = await globals_var.client_bot.loop.run_in_executor(None, pytube.Playlist, link)
+        pytube_urls = playlist.video_urls
+        await globals_var.client_bot.loop.run_in_executor(None, urls.extend, pytube_urls)
+        numbers_new_musics = len(urls)
+        res = []
+        while urls:
+            await my_functions.edit(interaction, content=f"Loading playlist: {len(res)}/{numbers_new_musics}.")
+            video_ids = list(map(lambda n: n.split("https://www.youtube.com/watch?v=", 1)[1], urls[:50]))
+            res.extend(await globals_var.client_bot.loop.run_in_executor(None, create_music_items, video_ids))
+            urls = urls[50:]
+
         await my_functions.edit(interaction, content=f"Loading playlist: {len(res)}/{numbers_new_musics}.")
-        video_ids = list(map(lambda n: n.split("https://www.youtube.com/watch?v=", 1)[1], urls[:50]))
-        res.extend(await globals_var.client_bot.loop.run_in_executor(None, create_music_items, video_ids))
-        urls = urls[50:]
-
-    await my_functions.edit(interaction, content=f"Loading playlist: {len(res)}/{numbers_new_musics}.")
-    return res
+        return res
 
 
+# Not use
 # Faster than playlist_link but costs twice in YouTube API units
 def playlist_link2(link):
     playlist_id = link.split("list=", 1)[1].split("&", 1)[0]

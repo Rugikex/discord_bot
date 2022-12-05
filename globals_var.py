@@ -47,6 +47,11 @@ queues_message = {}
 reactions_song = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
 reactions_queue = ["⬆️", "⬇️"]
 
+"""
+Can do one request by one with youtube api
+"""
+queue_request_youtube = {}
+
 
 def initialize():
     global current_music, specifics_searches, queues_musics, queues_message,\

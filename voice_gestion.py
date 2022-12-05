@@ -171,8 +171,7 @@ async def stop_music(interaction: discord.Interaction):
     if voice_client is None:
         return
 
-    globals_var.queues_musics[interaction.guild_id] = None
-    voice_client.stop()
+    my_functions.disconnect_bot(voice_client, interaction.guild_id)
 
     await my_functions.send(interaction, 'The bot stops playing musics.')
 
@@ -182,13 +181,10 @@ async def disconnect(interaction: discord.Interaction):
     if voice_client is None:
         return
 
-    globals_var.queues_musics.pop(interaction.guild_id, None)
-    voice_client.stop()
+    await my_functions.disconnect_bot(voice_client, interaction.guild_id)
 
     await my_functions.send(interaction, 'The bot is disconnected.')
     print(f"Bot disconnects to {voice_client.guild.name}.")
-
-    await voice_client.disconnect()
 
 
 async def is_connected(interaction: discord.Interaction, channel):
@@ -197,7 +193,7 @@ async def is_connected(interaction: discord.Interaction, channel):
         # Already connected
         return True
     try:
-        await channel.connect(timeout=1.5)
+        await channel.connect(timeout=1.5, self_deaf=True)
     except asyncio.TimeoutError:
         await my_functions.send(interaction, 'I can\'t connect to this channel!')
         return False
