@@ -1,6 +1,7 @@
 discord.py
 ffmpeg-python
 google-api-python-client
+lyricsgenius
 isodate
 PyNaCl
 python-dotenv

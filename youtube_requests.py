@@ -8,14 +8,21 @@ import pytube.exceptions
 
 import globals_var
 import my_functions
-from custom_classes import MusicItem
+from music_item import MusicItem
 
 
-def create_music_item(yt_obj):
-    return MusicItem("youtube", yt_obj.title, datetime.timedelta(seconds=yt_obj.length), yt_obj.watch_url)
+def create_music_item(yt_obj: object) -> MusicItem:
+    title = yt_obj.title
+    duration = None
+    try:
+        duration = datetime.timedelta(seconds=yt_obj.length)
+    except TypeError:
+        pass
+    url = yt_obj.watch_url
+    return MusicItem(title, duration, url)
 
 
-def create_music_items(video_ids):
+def create_music_items(video_ids: str) -> list[MusicItem]:
     res = []
     request = globals_var.youtube.videos().list(
         part="snippet,contentDetails,id",
@@ -24,15 +31,14 @@ def create_music_items(video_ids):
     response = request.execute()
 
     for item in response['items']:
-        res.append(MusicItem("youtube",
-                             item['snippet']['title'],
+        res.append(MusicItem(item['snippet']['title'],
                              isodate.parse_duration(item['contentDetails']['duration']),
                              "https://www.youtube.com/watch?v=" + item['id']))
 
     return res
 
 
-def specific_search(context):
+def specific_search(context: str) -> list[MusicItem]:
     search = pytube.Search(context)
     res = []
     results = search.results
@@ -41,36 +47,42 @@ def specific_search(context):
     return res
 
 
-def single_link(link):
+async def single_link(link: str) -> list[MusicItem]:
     try:
-        obj = pytube.YouTube(link)
+        obj = await globals_var.client_bot.loop.run_in_executor(None, pytube.YouTube, link)
     except pytube.exceptions.RegexMatchError:
         return []
 
     return [create_music_item(obj)]
 
 
-async def waiting_queue():
-    return
-
-
-async def playlist_link(interaction: discord.Interaction, link):
-    if len(globals_var.queue_request_youtube) == 0:
-        urls = []
-        # pytube.Playlist(link).video_urls returns pytube.helpers.DeferredGeneratorList that don't support slicing
-        playlist = await globals_var.client_bot.loop.run_in_executor(None, pytube.Playlist, link)
-        pytube_urls = playlist.video_urls
-        await globals_var.client_bot.loop.run_in_executor(None, urls.extend, pytube_urls)
-        numbers_new_musics = len(urls)
-        res = []
-        while urls:
-            await my_functions.edit(interaction, content=f"Loading playlist: {len(res)}/{numbers_new_musics}.")
-            video_ids = list(map(lambda n: n.split("https://www.youtube.com/watch?v=", 1)[1], urls[:50]))
-            res.extend(await globals_var.client_bot.loop.run_in_executor(None, create_music_items, video_ids))
-            urls = urls[50:]
-
-        await my_functions.edit(interaction, content=f"Loading playlist: {len(res)}/{numbers_new_musics}.")
-        return res
+async def playlist_link(interaction: discord.Interaction, link: str) -> list[MusicItem] | list[None] | None:
+    if globals_var.queue_request_youtube:
+        return [None]
+    globals_var.queue_request_youtube = interaction.guild_id
+    urls = []
+    # pytube.Playlist(link).video_urls returns pytube.helpers.DeferredGeneratorList that don't support slicing
+    playlist = await globals_var.client_bot.loop.run_in_executor(None, pytube.Playlist, link)
+    pytube_urls = playlist.video_urls
+    await globals_var.client_bot.loop.run_in_executor(None, urls.extend, pytube_urls)
+    numbers_new_musics = len(urls)
+    res = []
+    message = globals_var.loading_playlist_message[interaction.guild_id]
+    while urls:
+        voice_client: discord.VoiceClient = discord.utils.get(globals_var.client_bot.voice_clients,
+                                                              guild=interaction.guild)
+        if not voice_client:
+            return None
+        message = await my_functions.edit_message(message,
+                                                  content=f"Loading playlist: {len(res)}/{numbers_new_musics}.")
+        video_ids = list(map(lambda n: n.split("https://www.youtube.com/watch?v=", 1)[1], urls[:50]))
+        res.extend(await globals_var.client_bot.loop.run_in_executor(None, create_music_items, video_ids))
+        urls = urls[50:]
+    globals_var.queue_request_youtube = None
+    message = await my_functions.edit_message(message, content=f"Loading playlist: {len(res)}/{numbers_new_musics}.")
+    await my_functions.delete_msg(message)
+    globals_var.loading_playlist_message.pop(interaction.guild_id, None)
+    return res
 
 
 # Not use
@@ -92,7 +104,7 @@ def playlist_link2(link):
         video_ids = ','.join(map(str, map(lambda n: n['contentDetails']['videoId'], response_id['items'])))
         res.extend(create_music_items(video_ids))
 
-        request_id = globals_var.youtube.playlistItems()\
+        request_id = globals_var.youtube.playlistItems() \
             .list_next(previous_request=request_id, previous_response=response_id)
 
     return res

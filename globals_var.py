@@ -1,11 +1,16 @@
+import logging
 import os
-import datetime
 
 import discord
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 
-from custom_classes import MusicItem
+my_logger = logging.getLogger('Custom_logger_bot')
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+my_logger.addHandler(handler)
+my_logger.setLevel(logging.INFO)
 
 load_dotenv()
 
@@ -16,7 +21,8 @@ tree = discord.app_commands.CommandTree(client_bot)
 youtube_key = os.getenv("YOUTUBE_KEY")
 youtube = build("youtube", "v3", developerKey=youtube_key)
 
-wololo = MusicItem("youtube", "Welcome", datetime.timedelta(seconds=2), "https://www.youtube.com/watch?v=hSU0Z3_466s")
+skip_seconds = 10.0
+add_queue_seconds = 5.0
 
 """
 Store by guild id
@@ -42,7 +48,9 @@ Store by guild id
 Contains a list of MusicItem(s)
 """
 queues_musics = {}
+
 queues_message = {}
+loading_playlist_message = {}
 
 reactions_song = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
 reactions_queue = ["⬆️", "⬇️"]
@@ -50,9 +58,9 @@ reactions_queue = ["⬆️", "⬇️"]
 """
 Can do one request by one with youtube api
 """
-queue_request_youtube = {}
+queue_request_youtube = None
 
 
 def initialize():
-    global current_music, specifics_searches, queues_musics, queues_message,\
-        reactions_song, reactions_queue, client_bot, youtube, tree
+    global current_music, specifics_searches, queues_musics, queues_message, loading_playlist_message,\
+        reactions_song, reactions_queue, client_bot, youtube, tree, my_logger
