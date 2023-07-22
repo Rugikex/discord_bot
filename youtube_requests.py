@@ -1,4 +1,5 @@
 import datetime
+from typing import List
 
 import discord
 from googleapiclient.errors import HttpError
@@ -22,7 +23,7 @@ def create_music_item(yt_obj: object) -> MusicItem:
     return MusicItem(title, duration, url)
 
 
-def create_music_items(video_ids: str) -> list[MusicItem]:
+def create_music_items(video_ids: str) -> List[MusicItem]:
     res = []
     request = globals_var.youtube.videos().list(
         part="snippet,contentDetails,id", id=video_ids
@@ -41,7 +42,7 @@ def create_music_items(video_ids: str) -> list[MusicItem]:
     return res
 
 
-def specific_search(context: str) -> list[MusicItem]:
+def specific_search(context: str) -> List[MusicItem]:
     search = pytube.Search(context)
     res = []
     results = search.results
@@ -50,7 +51,7 @@ def specific_search(context: str) -> list[MusicItem]:
     return res
 
 
-async def single_link(link: str) -> list[MusicItem]:
+async def single_link(link: str) -> List[MusicItem]:
     try:
         obj = await globals_var.client_bot.loop.run_in_executor(
             None, pytube.YouTube, link
@@ -63,10 +64,10 @@ async def single_link(link: str) -> list[MusicItem]:
 
 async def playlist_link(
     interaction: discord.Interaction, link: str
-) -> list[MusicItem] | list[None] | None:
+) -> List[MusicItem] | List[None] | None:
     if globals_var.client_bot.his_using_youtube():
         return [None]
-    
+
     globals_var.client_bot.set_use_youtube_server_id(interaction.guild_id)
     urls = []
     # pytube.Playlist(link).video_urls returns pytube.helpers.DeferredGeneratorList that don't support slicing

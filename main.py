@@ -231,7 +231,7 @@ async def self(interaction: discord.Interaction, begin: int, end: int = None):
 
     if end is None:
         end = begin
-    
+
     server = client_bot.get_server(interaction.guild_id)
     queue_musics = server.get_queue_musics()
 

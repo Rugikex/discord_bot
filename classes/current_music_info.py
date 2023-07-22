@@ -6,28 +6,38 @@ from my_functions import delete_msg
 
 
 class CurrentMusicInfo:
-    def __init__(self, music: MusicItem, message: discord.Message, audio: AudioSourceTracked) -> None:
+    def __init__(
+        self,
+        music: MusicItem,
+        message: discord.Message | None,
+        audio: AudioSourceTracked,
+    ) -> None:
         self.music = music
         self.message = message
         self.audio = audio
 
     def get_music(self) -> MusicItem:
         return self.music
-    
-    def get_message(self) -> discord.Message:
+
+    def get_message(self) -> discord.Message | None:
         return self.message
-    
+
     def get_audio(self) -> AudioSourceTracked:
         return self.audio
 
     async def delete_message(self) -> None:
         await delete_msg(self.message)
         self.message = None
-    
+
     def has_message(self) -> bool:
         return self.message is not None
 
-    def update(self, music: MusicItem, message: discord.Message, audio: AudioSourceTracked) -> None:
+    def update(
+        self,
+        music: MusicItem,
+        message: discord.Message | None,
+        audio: AudioSourceTracked,
+    ) -> None:
         self.music = music
         self.message = message
         self.audio = audio

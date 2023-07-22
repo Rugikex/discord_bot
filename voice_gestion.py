@@ -27,7 +27,7 @@ FFMPEG_OPTIONS = {
 
 
 async def user_is_connected(interaction: discord.Interaction):
-    if interaction.user.voice is None:
+    if isinstance(interaction.user, discord.User) or interaction.user.voice is None:
         await my_functions.send_by_channel(
             interaction.channel,
             "You have to be connected to a voice channel in this server!",
@@ -49,11 +49,12 @@ async def next_music(interaction: discord.Interaction, guild_id: int):
             info = ydl.extract_info(new_music.link, download=False)
 
         url = None
-        for info_format in info["formats"]:
-            if "asr" not in info_format:
-                continue
-            url = info_format["url"]
-            break
+        if info:
+            for info_format in info["formats"]:
+                if "asr" not in info_format:
+                    continue
+                url = info_format["url"]
+                break
 
         if url is None:
             await my_functions.send_by_channel(
@@ -177,18 +178,24 @@ async def skip_music(interaction: discord.Interaction, number: int):
         return
 
     real_number = number - 1  # Because the first music is the current music
-    
+
     server = globals_var.client_bot.get_server(interaction.guild_id)
     queue_musics = server.get_queue_musics()
-    music_playing_skip = server.get_current_music_info().get_music()
+    if server.has_current_music_info():
+        music_playing_skip = server.get_current_music_info().get_music()
+    else:
+        music_playing_skip = None
 
-    queue_musics.remove_musics(interaction, 1, real_number, send_msg=False)  # 1 because the pop(begin - 1)
+    await queue_musics.remove_musics(
+        interaction, 1, real_number, send_msg=False
+    )  # 1 because the pop(begin - 1)
 
     voice_client.stop()
 
-    await my_functions.send_by_channel(
-        interaction.channel, f'Skip {music_playing_skip}.'
-    )
+    if music_playing_skip:
+        await my_functions.send_by_channel(
+            interaction.channel, f"Skip {music_playing_skip}."
+        )
 
 
 async def stop_music(interaction: discord.Interaction):
@@ -238,10 +245,6 @@ async def is_connected(
         return False
 
     globals_var.client_bot.add_server(interaction.guild_id)
-    # server = globals_var.client_bot.get_server(interaction.guild_id)
-    # queue_musics = server.get_queue_musics()
-    # await queue_musics.add_in_queue(interaction, [wololo], 0, "Welcome", is_welcome_music=True)
-
     globals_var.my_logger.info(f"Bot connects to {interaction.guild.name}.")
     return True
 
@@ -257,14 +260,14 @@ async def select_specific_search(
     position = specific_search.get_position()
 
     if interaction.user.voice is None:
-        # await interaction.response.defer()
+        await interaction.response.defer()
         return
 
     voice_client = await get_voice_client(interaction)
     if voice_client is None:
         return
 
-    await specific_search.reset()
+    await specific_search.delete_message()
 
     queue_musics = server.get_queue_musics()
 
@@ -280,8 +283,8 @@ async def select_specific_search(
 async def create_button_select(number: int, content: str) -> discord.ui.Button:
     button = discord.ui.Button(emoji=globals_var.reactions_song[number])
 
-    async def button_callback(interact: discord.Interaction):
-        await select_specific_search(interact, number, content)
+    async def button_callback(interaction: discord.Interaction):
+        await select_specific_search(interaction, number, content)
 
     button.callback = button_callback
     return button
@@ -291,7 +294,7 @@ async def play(
     interaction: discord.Interaction,
     content: str,
     shuffle: bool = False,
-    position: int = None,
+    position: int | None = None,
 ):
     if not await user_is_connected(interaction):
         return
@@ -305,11 +308,11 @@ async def play(
             interaction.channel, "I have been disconnected."
         )
         return
-    
+
     server = globals_var.client_bot.get_server(interaction.guild_id)
     queue_musics = server.get_queue_musics()
 
-    if position and ( position < 1 or position > queue_musics.get_queue_size() ):
+    if position and (position < 1 or position > queue_musics.get_queue_size()):
         position = None
 
     if re.match(
@@ -332,11 +335,8 @@ async def play(
         musics = await youtube_requests.single_link(content)
         # musics = await globals_var.client_bot.loop.run_in_executor(None, youtube_requests.single_link, content)
     else:
-        
         if server.has_specifics_searches():
-            await my_functions.delete_msg(
-                server.get_specifics_searches().get_message()
-            )
+            await my_functions.delete_msg(server.get_specifics_searches().get_message())
 
         message = await my_functions.send_by_channel(
             interaction.channel, f"Searching for music related to {content}."
@@ -354,19 +354,17 @@ async def play(
             )
             return
 
-        specific_search = SpecificSearches(searches, shuffle, interaction.user, message, position)
+        specific_search = SpecificSearches(
+            searches, shuffle, interaction.user, message, position
+        )
         server.set_specifics_searches(specific_search)
 
         msg_content = f"Select a track with buttons.\n\n"
-        for i in range(
-            len(searches)
-        ):
-            msg_content += f'**{i + 1}:** {searches[i]}\n'
+        for i in range(len(searches)):
+            msg_content += f"**{i + 1}:** {searches[i]}\n"
 
         view = discord.ui.View()
-        for i in range(
-            len(searches)
-        ):
+        for i in range(len(searches)):
             view.add_item(await create_button_select(i, content))
 
         await my_functions.edit_message(message, content=msg_content, view=view)
@@ -396,7 +394,12 @@ async def play(
         await my_functions.send_by_channel(
             interaction.channel, "No playlist found, loading music..."
         )
-        musics = youtube_requests.single_link(match[match.lastindex - 1])
+        if match:
+            if match.lastindex:
+                index = match.lastindex - 1
+            else:
+                index = 0
+            musics = await youtube_requests.single_link(match[index])
         # musics = await globals_var.client_bot.loop.run_in_executor(None, youtube_requests.single_link,
         #                                                            match[match.lastindex - 1])
 
@@ -406,7 +409,8 @@ async def play(
         )
         return
 
-    await my_functions.delete_msg(await my_functions.get_response(interaction))
+    response = await my_functions.get_response(interaction)
+    await my_functions.delete_msg(response)
 
     if shuffle and position:
         random.seed()
@@ -420,8 +424,5 @@ async def play(
     voice_client = discord.utils.get(
         globals_var.client_bot.voice_clients, guild=interaction.guild
     )
-    if (
-        voice_client.source is None
-        or server.has_current_music_info()
-    ):
+    if voice_client.source is None or server.has_current_music_info():
         await next_music(interaction, interaction.guild_id)

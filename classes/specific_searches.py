@@ -7,7 +7,14 @@ from my_functions import delete_msg
 
 
 class SpecificSearches:
-    def __init__(self, searches: List[MusicItem], shuffle: bool, user: discord.User, message: discord.Message, position: int) -> None:
+    def __init__(
+        self,
+        searches: List[MusicItem],
+        shuffle: bool,
+        user: discord.Member,
+        message: discord.Message | None,
+        position: int | None,
+    ) -> None:
         self.searches = searches
         self.shuffle = shuffle
         self.user = user
@@ -20,13 +27,13 @@ class SpecificSearches:
     def get_shuffle(self) -> bool:
         return self.shuffle
 
-    def get_user(self) -> discord.User:
+    def get_user(self) -> discord.Member:
         return self.user
 
-    def get_message(self) -> discord.Message:
+    def get_message(self) -> discord.Message | None:
         return self.message
-    
-    def get_position(self) -> int:
+
+    def get_position(self) -> int | None:
         return self.position
 
     def get_music(self, index: int) -> MusicItem:
@@ -37,11 +44,6 @@ class SpecificSearches:
 
     def set_message(self, message: discord.Message) -> None:
         self.message = message
-    
-    async def reset(self) -> None:
-        self.searches = None
-        self.shuffle = None
-        self.user = None
+
+    async def delete_message(self) -> None:
         await delete_msg(self.message)
-        self.message = None
-        self.position = None

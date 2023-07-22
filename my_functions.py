@@ -1,6 +1,20 @@
+import dis
+from typing import Union
 import discord
 
 import globals_var
+
+
+InteractionChannel = Union[
+    discord.VoiceChannel,
+    discord.StageChannel,
+    discord.TextChannel,
+    discord.ForumChannel,
+    discord.CategoryChannel,
+    discord.Thread,
+    discord.DMChannel,
+    discord.GroupChannel,
+]
 
 
 async def get_response(interaction: discord.Interaction):
@@ -11,14 +25,18 @@ async def get_response(interaction: discord.Interaction):
 
 
 async def send_by_channel(
-    channel: discord.GroupChannel,
+    channel: InteractionChannel | discord.abc.MessageableChannel | None,
     content: str,
     permanent: bool = False,
-    view: discord.ui.View = None,
+    view: discord.ui.View | None = None,
 ) -> discord.Message | None:
     if not channel:
         return None
     delete_after = None if permanent else 60.0
+
+    if not hasattr(channel, "send"):
+        return None
+
     try:
         return await channel.send(content, delete_after=delete_after, view=view)
     except discord.errors.HTTPException:
@@ -28,7 +46,7 @@ async def send_by_channel(
 async def send_by_interaction(
     interaction: discord.Interaction,
     content: str,
-    delete_after: float = None,
+    delete_after: float | None = None,
     view: discord.ui.View = discord.utils.MISSING,
 ):
     try:
@@ -60,10 +78,12 @@ async def edit_interaction(
 
 
 async def edit_message(
-    message: discord.Message,
+    message: discord.Message | None,
     content: str = discord.utils.MISSING,
     view: discord.ui.View = discord.utils.MISSING,
-) -> discord.Message:
+) -> discord.Message | None:
+    if not message:
+        return None
     try:
         return await message.edit(content=content, view=view)
     except discord.errors.HTTPException:
@@ -81,7 +101,7 @@ async def edit_response(
         pass
 
 
-async def delete_msg(message: discord.Message | discord.InteractionMessage):
+async def delete_msg(message: discord.Message | discord.InteractionMessage | None):
     if message is None or isinstance(message, discord.InteractionResponse):
         return
     try:
@@ -90,10 +110,15 @@ async def delete_msg(message: discord.Message | discord.InteractionMessage):
         pass
 
 
-async def disconnect_bot(voice_client: discord.VoiceClient, guild_id: int):
+async def disconnect_bot(
+    voice_client: discord.VoiceClient, guild_id: int | None
+) -> None:
+    if not guild_id:
+        return
+
     server = globals_var.client_bot.get_server(guild_id)
-    await server.get_queue_musics().clear_queue(None, check=False)
-    
+    await server.get_queue_musics().clear_queue(None)
+
     voice_client.stop()
     await voice_client.disconnect()
 
