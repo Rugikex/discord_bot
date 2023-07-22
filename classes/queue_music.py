@@ -26,10 +26,11 @@ class QueueMusic:
     def get_queue_size(self) -> int:
         return len(self.musics)
     
-    async def clear_queue(self, interaction: discord.Interaction) -> None:
-        voice_client = await voice_gestion.check_voice_client(interaction)
-        if voice_client is None:
-            return
+    async def clear_queue(self, interaction: discord.Interaction, check: bool = True) -> None:
+        if check:
+            voice_client = await voice_gestion.check_voice_client(interaction)
+            if voice_client is None:
+                return
         
         self.musics = []
     

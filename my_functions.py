@@ -92,15 +92,17 @@ async def delete_msg(message: discord.Message | discord.InteractionMessage):
 
 async def disconnect_bot(voice_client: discord.VoiceClient, guild_id: int):
     server = globals_var.client_bot.get_server(guild_id)
-    await server.get_queue_musics().clear_queue()
+    await server.get_queue_musics().clear_queue(None, check=False)
     
     voice_client.stop()
     await voice_client.disconnect()
 
-    server.disconnect()
+    await server.disconnect()
 
     if globals_var.client_bot.get_use_youtube_server_id() == guild_id:
         globals_var.client_bot.set_use_youtube_server_id(None)
+
+    globals_var.client_bot.remove_server(guild_id)
 
     globals_var.my_logger.info(f"Bot disconnects to {voice_client.guild.name}.")
 

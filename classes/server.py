@@ -1,5 +1,3 @@
-from typing import List, Union
-
 import discord
 
 from classes.audio_source_tracked import AudioSourceTracked
@@ -68,8 +66,8 @@ class Server:
         return self.specifics_searches is not None
     
     async def clear_current_and_queue_messages(self) -> None:
-        print("Clearing current and queue messages")
-        await self.current_music_info.delete_message()
+        if self.current_music_info:
+            await self.current_music_info.delete_message()
         await self.queue_musics.delete_message()
         self.current_music_info = None
 

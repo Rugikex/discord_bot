@@ -7,6 +7,8 @@ from googleapiclient.discovery import build
 
 from classes.my_client import MyClient
 
+logging.getLogger("pytube").setLevel(logging.CRITICAL)
+
 my_logger = logging.getLogger("Discord_bot")
 handler = logging.StreamHandler()
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
