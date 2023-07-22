@@ -34,22 +34,23 @@ class Server:
         return self.loading_playlist_message
     
     async def set_current_music_info(self, interaction: discord.Interaction,  music: MusicItem, audio: AudioSourceTracked) -> None:
-        message = await my_functions.send_by_channel(
-            interaction.channel, f"Now playing {music}.", permanent=True
-        )
-
         if self.current_music_info is None:
+            message = await my_functions.send_by_channel(
+                interaction.channel, f"Now playing {music}.", permanent=True
+            )
             self.current_music_info = CurrentMusicInfo(music, message, audio)
             return
         
         try:
-            # FIXME: Il n'y a pas de await a faire attention
             last_message = [message async for message in interaction.channel.history(limit=1)][0]
         except:
             last_message = None
 
-        if last_message is not None and self.current_music_info.has_message() is not None and last_message.id != self.current_music_info.get_message().id:
+        if last_message is not None and self.current_music_info.has_message() and last_message.id != self.current_music_info.get_message().id:
             await self.current_music_info.delete_message()
+            message = await my_functions.send_by_channel(
+                interaction.channel, f"Now playing {music}.", permanent=True
+            )
         else:
             message = await my_functions.edit_message(self.current_music_info.get_message(), f"Now playing {music}.")
         self.current_music_info.update(music, message, audio)
@@ -67,6 +68,7 @@ class Server:
         return self.specifics_searches is not None
     
     async def clear_current_and_queue_messages(self) -> None:
+        print("Clearing current and queue messages")
         await self.current_music_info.delete_message()
         await self.queue_musics.delete_message()
         self.current_music_info = None

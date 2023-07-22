@@ -7,7 +7,6 @@ import discord
 import yt_dlp
 
 from classes.audio_source_tracked import AudioSourceTracked
-from classes.music_item import MusicItem
 from classes.specific_searches import SpecificSearches
 import globals_var
 import my_functions
@@ -73,14 +72,14 @@ async def next_music(interaction: discord.Interaction, guild_id: int):
 
         audio = AudioSourceTracked(raw_audio)
 
+        await server.set_current_music_info(interaction, new_music, audio)
+
         voice_client.play(
             audio,
             after=lambda x=None: asyncio.run_coroutine_threadsafe(
                 next_music(interaction, guild_id), globals_var.client_bot.loop
             ),
         )
-
-        await server.set_current_music_info(interaction, new_music, audio)
     else:
         await server.clear_current_and_queue_messages()
 
@@ -258,7 +257,7 @@ async def select_specific_search(
     position = specific_search.get_position()
 
     if interaction.user.voice is None:
-        await interaction.response.defer()
+        # await interaction.response.defer()
         return
 
     voice_client = await get_voice_client(interaction)
