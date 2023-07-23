@@ -15,12 +15,16 @@ class Server:
         self.specifics_searches: SpecificSearches | None = None
         self.queue_musics: QueueMusic = QueueMusic()
         self.loading_playlist_message: discord.Message | None = None
+        self.is_disconnect: bool = False
 
     def get_id(self) -> int:
         return self.id
 
     def get_current_music_info(self) -> CurrentMusicInfo | None:
         return self.current_music_info
+    
+    def get_is_disconnect(self) -> bool:
+        return self.is_disconnect
 
     def get_specifics_searches(self) -> SpecificSearches | None:
         return self.specifics_searches
@@ -92,6 +96,9 @@ class Server:
             await self.current_music_info.delete_message()
         await self.queue_musics.delete_message()
         self.current_music_info = None
+    
+    def being_disconnect(self) -> None:
+        self.is_disconnect = True
 
     async def disconnect(self) -> None:
         await self.clear_current_and_queue_messages()

@@ -1,6 +1,7 @@
-import dis
-from typing import Union
+import asyncio
 import discord
+from typing import Union
+
 
 import globals_var
 
@@ -25,7 +26,7 @@ async def get_response(interaction: discord.Interaction):
 
 
 async def send_by_channel(
-    channel: InteractionChannel | discord.abc.MessageableChannel | None,
+    channel: InteractionChannel | None,
     content: str,
     permanent: bool = False,
     view: discord.ui.View | None = None,
@@ -117,11 +118,15 @@ async def disconnect_bot(
         return
 
     server = globals_var.client_bot.get_server(guild_id)
+    if server.get_is_disconnect():
+        return
+    server.being_disconnect()
     await server.get_queue_musics().clear_queue(None)
 
     voice_client.stop()
-    await voice_client.disconnect()
+    await asyncio.sleep(1.0)  # Wait for the music to stop
 
+    await voice_client.disconnect()
     await server.disconnect()
 
     if globals_var.client_bot.get_use_youtube_server_id() == guild_id:
