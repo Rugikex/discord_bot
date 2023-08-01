@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 import random
 import re
 
@@ -14,11 +13,13 @@ import youtube_requests
 
 ydl_opts = {
     "audio-quality": 0,
+    "download": False,
     "extract-audio": True,
     "format": "bestaudio",
     "fps": None,
-    "youtube_include_dash_manifest": False,
+    "loglevel": "ERROR",
     "quiet": True,
+    "youtube_include_dash_manifest": False,
 }
 FFMPEG_OPTIONS = {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 3",
@@ -26,7 +27,7 @@ FFMPEG_OPTIONS = {
 }
 
 
-async def user_is_connected(interaction: discord.Interaction):
+async def user_is_connected(interaction: discord.Interaction) -> bool:
     if isinstance(interaction.user, discord.User) or interaction.user.voice is None:
         await my_functions.send_by_channel(
             interaction.channel,
@@ -37,7 +38,7 @@ async def user_is_connected(interaction: discord.Interaction):
     return True
 
 
-async def next_music(interaction: discord.Interaction, guild_id: int):
+async def next_music(interaction: discord.Interaction, guild_id: int) -> None:
     voice_client = await get_voice_client(interaction, check=False)
     server = globals_var.client_bot.get_server(guild_id)
     queue_musics = server.get_queue_musics()
@@ -46,7 +47,9 @@ async def next_music(interaction: discord.Interaction, guild_id: int):
         new_music = queue_musics.get_next_music()
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(new_music.link, download=False)
+            info = await globals_var.client_bot.loop.run_in_executor(
+                None, ydl.extract_info, new_music.link
+            )
 
         url = None
         if info:
@@ -140,7 +143,7 @@ async def client_is_disconnected(interaction: discord.Interaction) -> bool:
     return False
 
 
-async def pause_music(interaction: discord.Interaction):
+async def pause_music(interaction: discord.Interaction) -> None:
     voice_client = await check_voice_client(interaction)
     if voice_client is None:
         return
@@ -156,7 +159,7 @@ async def pause_music(interaction: discord.Interaction):
     await my_functions.send_by_channel(interaction.channel, "The music is paused.")
 
 
-async def resume_music(interaction: discord.Interaction):
+async def resume_music(interaction: discord.Interaction) -> None:
     voice_client = await check_voice_client(interaction)
     if voice_client is None:
         return
@@ -172,7 +175,7 @@ async def resume_music(interaction: discord.Interaction):
     await my_functions.send_by_channel(interaction.channel, "The music resumes.")
 
 
-async def skip_music(interaction: discord.Interaction, number: int):
+async def skip_music(interaction: discord.Interaction, number: int) -> None:
     voice_client = await check_voice_client(interaction)
     if voice_client is None:
         return
@@ -198,7 +201,7 @@ async def skip_music(interaction: discord.Interaction, number: int):
         )
 
 
-async def stop_music(interaction: discord.Interaction):
+async def stop_music(interaction: discord.Interaction) -> None:
     voice_client = await check_voice_client(interaction)
     if voice_client is None:
         return
@@ -209,7 +212,7 @@ async def stop_music(interaction: discord.Interaction):
     )
 
 
-async def disconnect(interaction: discord.Interaction):
+async def disconnect(interaction: discord.Interaction) -> None:
     voice_client = await get_voice_client(interaction)
     if voice_client is None:
         return
@@ -251,9 +254,12 @@ async def is_connected(
 
 async def select_specific_search(
     interaction: discord.Interaction, number: int, content: str
-):
+) -> None:
     server = globals_var.client_bot.get_server(interaction.guild_id)
     specific_search = server.get_specifics_searches()
+
+    if specific_search is None:
+        return
 
     music = specific_search.get_music(number)
     shuffle = specific_search.get_shuffle()
@@ -295,7 +301,7 @@ async def play(
     content: str,
     shuffle: bool = False,
     position: int | None = None,
-):
+) -> None:
     if not await user_is_connected(interaction):
         return
 
@@ -333,7 +339,6 @@ async def play(
     ):
         await my_functions.send_by_channel(interaction.channel, "Loading music...")
         musics = await youtube_requests.single_link(content)
-        # musics = await globals_var.client_bot.loop.run_in_executor(None, youtube_requests.single_link, content)
     else:
         if server.has_specifics_searches():
             await my_functions.delete_msg(server.get_specifics_searches().get_message())
@@ -343,7 +348,6 @@ async def play(
         )
 
         searches = youtube_requests.specific_search(content)
-        # searches = await globals_var.client_bot.loop.run_in_executor(None, youtube_requests.specific_search, content)
 
         if await client_is_disconnected(interaction):
             return
@@ -400,17 +404,12 @@ async def play(
             else:
                 index = 0
             musics = await youtube_requests.single_link(match[index])
-        # musics = await globals_var.client_bot.loop.run_in_executor(None, youtube_requests.single_link,
-        #                                                            match[match.lastindex - 1])
 
     if not musics:
         await my_functions.send_by_channel(
             interaction.channel, f'No audio found for "{content}".'
         )
         return
-
-    response = await my_functions.get_response(interaction)
-    await my_functions.delete_msg(response)
 
     if shuffle and position:
         random.seed()
@@ -421,8 +420,8 @@ async def play(
     if shuffle and not position:
         await queue_musics.shuffle_queue(interaction)
 
-    voice_client = discord.utils.get(
-        globals_var.client_bot.voice_clients, guild=interaction.guild
-    )
-    if voice_client.source is None or server.has_current_music_info():
+    voice_client = await get_voice_client(interaction, check=False)
+    if voice_client is None:
+        return
+    if not voice_client.is_playing():
         await next_music(interaction, interaction.guild_id)

@@ -149,7 +149,9 @@ async def self(interaction: discord.Interaction):
 
 
 @tree.command(name="play", description="Play youtube url/playlist or search terms.")
-async def self(interaction: discord.Interaction, music: str, position: int = None):
+async def self(
+    interaction: discord.Interaction, music: str, position: int | None = None
+):
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -160,7 +162,7 @@ async def self(interaction: discord.Interaction, music: str, position: int = Non
 
 @tree.command(name="play_default", description="Play default musics of this server.")
 async def self(
-    interaction: discord.Interaction, shuffle: bool = False, position: int = None
+    interaction: discord.Interaction, shuffle: bool = False, position: int | None = None
 ):
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")

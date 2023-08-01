@@ -22,7 +22,7 @@ class Server:
 
     def get_current_music_info(self) -> CurrentMusicInfo | None:
         return self.current_music_info
-    
+
     def get_is_disconnect(self) -> bool:
         return self.is_disconnect
 
@@ -96,7 +96,7 @@ class Server:
             await self.current_music_info.delete_message()
         await self.queue_musics.delete_message()
         self.current_music_info = None
-    
+
     def being_disconnect(self) -> None:
         self.is_disconnect = True
 

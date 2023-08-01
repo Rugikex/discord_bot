@@ -7,7 +7,9 @@ from googleapiclient.discovery import build
 
 from classes.my_client import MyClient
 
-logging.getLogger("pytube").setLevel(logging.CRITICAL)
+logging.getLogger("discord.player").setLevel(logging.WARNING)
+logging.getLogger("discord.voice_client").setLevel(logging.WARNING)
+logging.getLogger("pytube").setLevel(logging.ERROR)
 
 my_logger = logging.getLogger("Discord_bot")
 handler = logging.StreamHandler()
@@ -37,5 +39,4 @@ reactions_queue = ["⬆️", "⬇️"]
 
 
 def initialize():
-    # global current_music, specifics_searches, queues_musics, queues_message, loading_playlist_message, reactions_song, reactions_queue, client_bot, youtube, tree, my_logger
     global reactions_song, reactions_queue, client_bot, youtube, tree, my_logger
