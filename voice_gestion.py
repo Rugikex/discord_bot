@@ -11,16 +11,7 @@ import globals_var
 import my_functions
 import youtube_requests
 
-ydl_opts = {
-    "audio-quality": 0,
-    "download": False,
-    "extract-audio": True,
-    "format": "bestaudio",
-    "fps": None,
-    "loglevel": "ERROR",
-    "quiet": True,
-    "youtube_include_dash_manifest": False,
-}
+
 FFMPEG_OPTIONS = {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 3",
     "options": "-vn -loglevel quiet",
@@ -46,7 +37,7 @@ async def next_music(interaction: discord.Interaction, guild_id: int) -> None:
     if queue_musics.has_next_music() and voice_client is not None:
         new_music = queue_musics.get_next_music()
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(globals_var.ydl_opts) as ydl:
             info = await globals_var.client_bot.loop.run_in_executor(
                 None, ydl.extract_info, new_music.link
             )

@@ -18,6 +18,39 @@ handler.setFormatter(formatter)
 my_logger.addHandler(handler)
 my_logger.setLevel(logging.INFO)
 
+class LoggerYdl:
+    """
+    Logger for yt-dlp
+    Only print error
+    """
+    def debug(self, msg):
+        # For compatibility with youtube-dl, both debug and info are passed into debug
+        # You can distinguish them by the prefix '[debug] '
+        if msg.startswith('[debug] '):
+            pass
+        else:
+            self.info(msg)
+
+    def info(self, msg):
+        pass
+
+    def warning(self, msg):
+        pass
+
+    def error(self, msg):
+        print(msg)
+
+ydl_opts = {
+    "audio-quality": 0,
+    "download": False,
+    "extract-audio": True,
+    "format": "bestaudio",
+    "fps": None,
+    'logger': LoggerYdl(),
+    "quiet": True,
+    "youtube_include_dash_manifest": False,
+}
+
 load_dotenv()
 
 discord_key = os.getenv("DISCORD_KEY")
@@ -39,4 +72,4 @@ reactions_queue = ["⬆️", "⬇️"]
 
 
 def initialize():
-    global reactions_song, reactions_queue, client_bot, youtube, tree, my_logger
+    global client_bot, youtube, tree, my_logger
