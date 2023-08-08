@@ -1,4 +1,6 @@
-# custom music for specific server id
+from typing import Dict
 
-default_musics = {
+
+# custom music/playlist for specific server id
+default_musics: Dict[int, str] = {
 }
