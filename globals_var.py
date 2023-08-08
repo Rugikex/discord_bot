@@ -18,15 +18,17 @@ handler.setFormatter(formatter)
 my_logger.addHandler(handler)
 my_logger.setLevel(logging.INFO)
 
+
 class LoggerYdl:
     """
     Logger for yt-dlp
     Only print error
     """
+
     def debug(self, msg):
         # For compatibility with youtube-dl, both debug and info are passed into debug
         # You can distinguish them by the prefix '[debug] '
-        if msg.startswith('[debug] '):
+        if msg.startswith("[debug] "):
             pass
         else:
             self.info(msg)
@@ -40,13 +42,14 @@ class LoggerYdl:
     def error(self, msg):
         print(msg)
 
+
 ydl_opts = {
     "audio-quality": 0,
     "download": False,
     "extract-audio": True,
     "format": "bestaudio",
     "fps": None,
-    'logger': LoggerYdl(),
+    "logger": LoggerYdl(),
     "quiet": True,
     "youtube_include_dash_manifest": False,
 }
