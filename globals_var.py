@@ -45,12 +45,11 @@ class LoggerYdl:
 
 ydl_opts = {
     "audio-quality": 0,
-    "download": False,
+    "simulate": True,
     "extract-audio": True,
     "format": "bestaudio",
     "fps": None,
     "logger": LoggerYdl(),
-    "quiet": True,
     "youtube_include_dash_manifest": False,
 }
 

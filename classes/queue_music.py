@@ -151,6 +151,7 @@ class QueueMusic:
         musics: List[MusicItem],
         position: int,
         content: str,
+        shuffle: bool,
     ):
         if position is not None:
             for i in range(len(musics)):
@@ -180,6 +181,9 @@ class QueueMusic:
                     interaction.channel,
                     f'Added to queue: "{musics[0]}".\n' f'From: "{content}".',
                 )
+
+        if shuffle:
+            await self.shuffle_queue(interaction)
 
         if self.is_new:
             wololo = MusicItem(

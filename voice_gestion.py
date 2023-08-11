@@ -268,10 +268,11 @@ async def select_specific_search(
 
     queue_musics = server.get_queue_musics()
 
-    await queue_musics.add_in_queue(interaction, [music], position, content)
+    shuffle_queue = shuffle and not position
 
-    if shuffle and not position:
-        await queue_musics.shuffle_queue(interaction)
+    await queue_musics.add_in_queue(
+        interaction, [music], position, content, shuffle_queue
+    )
 
     if not voice_client.is_playing():
         await next_music(interaction, interaction.guild_id)
@@ -406,10 +407,11 @@ async def play(
         random.seed()
         random.shuffle(musics)
 
-    await queue_musics.add_in_queue(interaction, musics, position, content)
+    shuffle_queue = shuffle and not position
 
-    if shuffle and not position:
-        await queue_musics.shuffle_queue(interaction)
+    await queue_musics.add_in_queue(
+        interaction, musics, position, content, shuffle_queue
+    )
 
     voice_client = await get_voice_client(interaction, check=False)
     if voice_client is None:
