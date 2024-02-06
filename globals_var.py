@@ -72,6 +72,8 @@ add_queue_seconds = 5.0
 reactions_song = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
 reactions_queue = ["⬆️", "⬇️"]
 
+msg_blacklist = "Sorry, you can't use this bot."
+
 
 def initialize():
     global client_bot, youtube, tree, my_logger

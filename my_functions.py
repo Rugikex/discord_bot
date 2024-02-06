@@ -144,3 +144,7 @@ async def add_reaction(interaction: discord.Interaction, reaction):
         await interaction_message.add_reaction(reaction)
     except discord.errors.NotFound:
         pass
+
+
+def user_is_blacklisted(user_id: int) -> bool:
+    return user_id in globals_var.client_bot.blacklist

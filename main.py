@@ -96,6 +96,11 @@ async def self(interaction: discord.Interaction):
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     server = client_bot.get_server(interaction.guild_id)
     queue_musics = server.get_queue_musics()
     await client_bot.loop.create_task(queue_musics.clear_queue(interaction))
@@ -109,6 +114,11 @@ async def self(interaction: discord.Interaction):
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     await client_bot.loop.create_task(voice_gestion.disconnect(interaction))
 
 
@@ -117,6 +127,11 @@ async def self(interaction: discord.Interaction):
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     await client_bot.loop.create_task(msg_help(interaction))
 
 
@@ -125,6 +140,11 @@ async def self(interaction: discord.Interaction, position: int, new_position: in
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     server = client_bot.get_server(interaction.guild_id)
     queue_musics = server.get_queue_musics()
     await client_bot.loop.create_task(
@@ -137,6 +157,11 @@ async def self(interaction: discord.Interaction):
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     await client_bot.loop.create_task(display_current_music(interaction))
 
 
@@ -145,6 +170,11 @@ async def self(interaction: discord.Interaction):
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     await client_bot.loop.create_task(voice_gestion.pause_music(interaction))
 
 
@@ -155,6 +185,11 @@ async def self(
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     await client_bot.loop.create_task(
         voice_gestion.play(interaction, music, position=position)
     )
@@ -167,6 +202,11 @@ async def self(
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     if interaction.guild_id not in secret_list.default_musics:
         await client_bot.loop.create_task(
             my_functions.send_by_channel(
@@ -193,6 +233,11 @@ async def self(interaction: discord.Interaction, music: str, shuffle: bool = Fal
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     await client_bot.loop.create_task(
         voice_gestion.play(interaction, music, position=1, shuffle=shuffle)
     )
@@ -203,6 +248,11 @@ async def self(interaction: discord.Interaction, music: str):
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     await client_bot.loop.create_task(
         voice_gestion.play(interaction, music, shuffle=True)
     )
@@ -213,6 +263,11 @@ async def self(interaction: discord.Interaction, page: int = 1):
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     server = client_bot.get_server(interaction.guild_id)
     queue_musics = server.get_queue_musics()
     await client_bot.loop.create_task(queue_musics.get_queue(interaction, page))
@@ -225,6 +280,11 @@ async def self(interaction: discord.Interaction, begin: int, end: int = None):
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     if begin < 1 or (end is not None and end < 1) or (end is not None and end < begin):
         await client_bot.loop.create_task(
             my_functions.send_by_channel(interaction.channel, "Number is incorrect!")
@@ -247,6 +307,11 @@ async def self(interaction: discord.Interaction):
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     await client_bot.loop.create_task(voice_gestion.resume_music(interaction))
 
 
@@ -255,6 +320,11 @@ async def self(interaction: discord.Interaction):
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     server = client_bot.get_server(interaction.guild_id)
     queue_musics = server.get_queue_musics()
     await client_bot.loop.create_task(queue_musics.shuffle_queue(interaction))
@@ -270,6 +340,11 @@ async def self(interaction: discord.Interaction, number: int = 1):
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
     if number < 1:
         await client_bot.loop.create_task(
             my_functions.send_by_channel(interaction.channel, "Numbers are incorrect!")
@@ -284,7 +359,15 @@ async def self(interaction: discord.Interaction):
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
-    await client_bot.loop.create_task(voice_gestion.stop_music(interaction))
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
+
+    server = client_bot.get_server(interaction.guild_id)
+    queue_musics = server.get_queue_musics()
+    await client_bot.loop.create_task(queue_musics.stop_music(interaction))
 
 
 def main():

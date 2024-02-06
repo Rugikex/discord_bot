@@ -262,3 +262,15 @@ class QueueMusic:
         view = self.create_view_queue(page)
 
         await my_functions.edit_message(message, view=view)
+
+    async def stop_music(self, interaction: discord.Interaction) -> None:
+        voice_client = await voice_gestion.get_voice_client(interaction)
+        if voice_client is None:
+            return
+
+        self.musics = []
+
+        voice_client.stop()
+        await my_functions.send_by_channel(
+            interaction.channel, "The bot stops playing musics."
+        )

@@ -192,17 +192,6 @@ async def skip_music(interaction: discord.Interaction, number: int) -> None:
         )
 
 
-async def stop_music(interaction: discord.Interaction) -> None:
-    voice_client = await check_voice_client(interaction)
-    if voice_client is None:
-        return
-
-    voice_client.stop()
-    await my_functions.send_by_channel(
-        interaction.channel, "The bot stops playing musics."
-    )
-
-
 async def disconnect(interaction: discord.Interaction) -> None:
     voice_client = await get_voice_client(interaction)
     if voice_client is None:
