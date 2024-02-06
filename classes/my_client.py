@@ -3,7 +3,6 @@ from typing import Dict
 
 from discord import Client, Intents
 from discord.flags import Intents
-from globals_var import my_logger
 
 from classes.server import Server
 
@@ -28,7 +27,7 @@ class MyClient(Client):
                 try:
                     result.add(int(line))
                 except ValueError:
-                    my_logger.warning(f"Invalid user id in blacklist: {line}")
+                    pass
 
             return result
 

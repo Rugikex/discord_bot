@@ -16,6 +16,7 @@ class Server:
         self.queue_musics: QueueMusic = QueueMusic()
         self.loading_playlist_message: discord.Message | None = None
         self.is_disconnect: bool = False
+        self.looping: bool = False
 
     def get_id(self) -> int:
         return self.id
@@ -25,6 +26,9 @@ class Server:
 
     def get_is_disconnect(self) -> bool:
         return self.is_disconnect
+
+    def is_looping(self) -> bool:
+        return self.looping
 
     def get_specifics_searches(self) -> SpecificSearches | None:
         return self.specifics_searches
@@ -84,6 +88,9 @@ class Server:
         self, loading_playlist_message: discord.Message | None
     ) -> None:
         self.loading_playlist_message = loading_playlist_message
+
+    def switch_looping(self) -> None:
+        self.looping = not self.looping
 
     def has_current_music_info(self) -> bool:
         return self.current_music_info is not None

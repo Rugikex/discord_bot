@@ -135,6 +135,27 @@ async def self(interaction: discord.Interaction):
     await client_bot.loop.create_task(msg_help(interaction))
 
 
+@tree.command(name="loop", description="Loop or unloop the current music.")
+async def self(interaction: discord.Interaction):
+    await client_bot.loop.create_task(
+        my_functions.send_by_interaction(interaction, "Request received")
+    )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
+
+    server = client_bot.get_server(interaction.guild_id)
+    server.switch_looping()
+    await client_bot.loop.create_task(
+        my_functions.send_by_channel(
+            interaction.channel,
+            f"Looping is {'enabled' if server.is_looping() else 'disabled'}.",
+        )
+    )
+
+
 @tree.command(name="move", description="Move the 'position' music to 'new_position'")
 async def self(interaction: discord.Interaction, position: int, new_position: int):
     await client_bot.loop.create_task(

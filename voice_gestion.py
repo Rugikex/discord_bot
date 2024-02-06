@@ -34,8 +34,13 @@ async def next_music(interaction: discord.Interaction, guild_id: int) -> None:
     server = globals_var.client_bot.get_server(guild_id)
     queue_musics = server.get_queue_musics()
 
-    if queue_musics.has_next_music() and voice_client is not None:
-        new_music = queue_musics.get_next_music()
+    if (
+        queue_musics.has_next_music() or server.is_looping()
+    ) and voice_client is not None:
+        if server.is_looping() and server.has_current_music_info():
+            new_music = server.get_current_music_info().get_music()
+        else:
+            new_music = queue_musics.get_next_music()
 
         with yt_dlp.YoutubeDL(globals_var.ydl_opts) as ydl:
             info = await globals_var.client_bot.loop.run_in_executor(
