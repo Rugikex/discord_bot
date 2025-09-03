@@ -1,57 +1,50 @@
-import discord
+from __future__ import annotations
+from typing import TYPE_CHECKING
 
-from classes.audio_source_tracked import AudioSourceTracked
-from classes.current_music_info import CurrentMusicInfo
-from classes.music_item import MusicItem
-from classes.queue_music import QueueMusic
-from classes.specific_searches import SpecificSearches
+from classes.current_track import CurrentTrack
+from classes.track_queue import TrackQueue
 import my_functions
+
+if TYPE_CHECKING:
+    import discord
+
+    from classes.audio_source_tracked import AudioSourceTracked
+    from classes.search_results import SearchResults
+    from classes.track import Track
 
 
 class Server:
-    def __init__(self, id: int) -> None:
-        self.id = id
-        self.current_music_info: CurrentMusicInfo | None = None
-        self.specifics_searches: SpecificSearches | None = None
-        self.queue_musics: QueueMusic = QueueMusic()
-        self.loading_playlist_message: discord.Message | None = None
-        self.is_disconnect: bool = False
-        self.looping: bool = False
+    def __init__(self, server_id: int) -> None:
+        self._server_id: int = server_id
+        self._current_track: CurrentTrack | None = None
+        self._search_results: SearchResults | None = None
+        self._track_queue: TrackQueue = TrackQueue()
+        self._loading_playlist_message: discord.Message | None = None
+        self._is_disconnected: bool = False
+        self._is_looping: bool = False
 
-    def get_id(self) -> int:
-        return self.id
+    @property
+    def server_id(self) -> int:
+        return self._server_id
 
-    def get_current_music_info(self) -> CurrentMusicInfo | None:
-        return self.current_music_info
+    @property
+    def current_track(self) -> CurrentTrack | None:
+        return self._current_track
 
-    def get_is_disconnect(self) -> bool:
-        return self.is_disconnect
-
-    def is_looping(self) -> bool:
-        return self.looping
-
-    def get_specifics_searches(self) -> SpecificSearches | None:
-        return self.specifics_searches
-
-    def get_queue_musics(self) -> QueueMusic:
-        return self.queue_musics
-
-    def get_loading_playlist_message(self) -> discord.Message | None:
-        return self.loading_playlist_message
-
-    async def set_current_music_info(
+    async def update_current_track(
         self,
         interaction: discord.Interaction,
-        music: MusicItem,
+        track: Track,
         audio: AudioSourceTracked,
     ) -> None:
-        if self.current_music_info is None:
+        if self._current_track is None:
             message = await my_functions.send_by_channel(
-                interaction.channel, f"Now playing {music}.", permanent=True
+                interaction.channel, f"Now playing {track}.", permanent=True
             )
-            self.current_music_info = CurrentMusicInfo(music, message, audio)
+            self._current_track = CurrentTrack(track, message, audio)
             return
 
+        last_message: discord.Message | None
         try:
             if hasattr(interaction.channel, "history"):
                 last_message = [
@@ -59,57 +52,74 @@ class Server:
                 ][0]
             else:
                 last_message = None
-        except:
+        except discord.errors.Forbidden:
             last_message = None
 
+        message: discord.Message | None
         if (
             last_message is not None
-            and self.current_music_info.has_message()
-            and last_message.id != self.current_music_info.get_message().id
+            and self._current_track.message is not None
+            and last_message.id != self._current_track.message.id
         ):
-            await self.current_music_info.delete_message()
+            await self._current_track.delete_message()
             message = await my_functions.send_by_channel(
-                interaction.channel, f"Now playing {music}.", permanent=True
+                interaction.channel, f"Now playing {track}.", permanent=True
             )
-        elif self.current_music_info.has_message():
+        elif self._current_track.message is not None:
             message = await my_functions.edit_message(
-                self.current_music_info.get_message(), f"Now playing {music}."
+                self._current_track.message, f"Now playing {track}."
             )
         else:
             message = await my_functions.send_by_channel(
-                interaction.channel, f"Now playing {music}.", permanent=True
+                interaction.channel, f"Now playing {track}.", permanent=True
             )
-        self.current_music_info.update(music, message, audio)
+        self._current_track.update(track, message, audio)
 
-    def set_specifics_searches(self, specifics_searches: SpecificSearches) -> None:
-        self.specifics_searches = specifics_searches
+    @property
+    def search_results(self) -> SearchResults | None:
+        return self._search_results
 
-    def set_loading_playlist_message(
+    @search_results.setter
+    def search_results(self, value: SearchResults | None) -> None:
+        self._search_results = value
+
+    @property
+    def track_queue(self) -> TrackQueue:
+        return self._track_queue
+
+    @property
+    def loading_playlist_message(self) -> discord.Message | None:
+        return self._loading_playlist_message
+
+    @loading_playlist_message.setter
+    def loading_playlist_message(
         self, loading_playlist_message: discord.Message | None
     ) -> None:
-        self.loading_playlist_message = loading_playlist_message
+        self._loading_playlist_message = loading_playlist_message
+
+    @property
+    def is_disconnected(self) -> bool:
+        return self._is_disconnected
+
+    def disconnect(self) -> None:
+        self._is_disconnected = True
+
+    @property
+    def is_looping(self) -> bool:
+        return self._is_looping
 
     def switch_looping(self) -> None:
-        self.looping = not self.looping
-
-    def has_current_music_info(self) -> bool:
-        return self.current_music_info is not None
-
-    def has_specifics_searches(self) -> bool:
-        return self.specifics_searches is not None
+        self._is_looping = not self._is_looping
 
     async def clear_current_and_queue_messages(self) -> None:
-        if self.current_music_info:
-            await self.current_music_info.delete_message()
-        await self.queue_musics.delete_message()
-        self.current_music_info = None
+        if self._current_track is not None:
+            await self._current_track.delete_message()
+        await self._track_queue.delete_message()
+        self._current_track = None
 
-    def being_disconnect(self) -> None:
-        self.is_disconnect = True
-
-    async def disconnect(self) -> None:
+    async def clear(self) -> None:
         await self.clear_current_and_queue_messages()
-        await my_functions.delete_msg(self.loading_playlist_message)
-        if self.specifics_searches:
-            await self.specifics_searches.delete_message()
+        await my_functions.delete_msg(self._loading_playlist_message)
+        if self._search_results is not None:
+            await self._search_results.delete_message()
         # TODO: Delete other message

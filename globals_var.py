@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Any
 
 import discord
 from dotenv import load_dotenv
@@ -7,16 +8,33 @@ from googleapiclient.discovery import build
 
 from classes.my_client import MyClient
 
-logging.getLogger("discord.player").setLevel(logging.WARNING)
-logging.getLogger("discord.voice_client").setLevel(logging.WARNING)
-logging.getLogger("pytube").setLevel(logging.ERROR)
 
-my_logger = logging.getLogger("Discord_bot")
-handler = logging.StreamHandler()
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-handler.setFormatter(formatter)
-my_logger.addHandler(handler)
-my_logger.setLevel(logging.INFO)
+class ColorFormatter(logging.Formatter):
+    """Logging Formatter with colored output"""
+
+    GRAY: str = "\033[90m"
+    GREEN: str = "\033[32m"
+    RESET: str = "\033[0m"
+
+    LEVEL_COLOR = {
+        logging.DEBUG: "\033[1;90m",
+        logging.INFO: "\033[1;94m",
+        logging.WARNING: "\033[1;33m",
+        logging.ERROR: "\033[1;91m",
+        logging.CRITICAL: "\033[1;31m",
+    }
+
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
+        """Override formatTime to color the date"""
+        original_time: str = super().formatTime(record, datefmt)
+        return f"{self.GRAY}{original_time}{self.RESET}"
+
+    def format(self, record: logging.LogRecord) -> str:
+        record.levelname = (
+            f"{self.LEVEL_COLOR.get(record.levelno)}{record.levelname}{self.RESET}"
+        )
+        record.name = f"{self.GREEN}{record.name}{self.RESET}"
+        return super().format(record)
 
 
 class LoggerYdl:
@@ -43,6 +61,19 @@ class LoggerYdl:
         print(msg)
 
 
+logging.getLogger("discord.player").setLevel(logging.WARNING)
+logging.getLogger("discord.voice_client").setLevel(logging.WARNING)
+logging.getLogger("pytubefix").setLevel(logging.ERROR)
+
+my_logger: logging.Logger = logging.getLogger("discord_bot")
+handler: logging.StreamHandler = logging.StreamHandler()
+formatter: ColorFormatter = ColorFormatter(
+    "%(asctime)s %(levelname)s     %(name)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+)
+handler.setFormatter(formatter)
+my_logger.addHandler(handler)
+my_logger.setLevel(logging.INFO)
+
 ydl_opts = {
     "audio-quality": 0,
     "simulate": True,
@@ -55,25 +86,25 @@ ydl_opts = {
 
 load_dotenv()
 
-discord_key = os.getenv("DISCORD_KEY")
+discord_key: str | None = os.getenv("DISCORD_KEY")
 if discord_key is None:
     raise Exception("No DISCORD_KEY find")
-client_bot = MyClient(intents=discord.Intents.all())
-tree = discord.app_commands.CommandTree(client_bot)
+client_bot: MyClient = MyClient(intents=discord.Intents.all())
+tree: discord.app_commands.CommandTree = discord.app_commands.CommandTree(client_bot)
 
-youtube_key = os.getenv("YOUTUBE_KEY")
+youtube_key: str | None = os.getenv("YOUTUBE_KEY")
 if youtube_key is None:
     raise Exception("No YOUTUBE_KEY find")
-youtube = build("youtube", "v3", developerKey=youtube_key)
+youtube: Any = build("youtube", "v3", developerKey=youtube_key)
 
-skip_seconds = 10.0
-add_queue_seconds = 5.0
+skip_seconds: float = 10.0
+add_queue_seconds: float = 5.0
 
-reactions_song = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
-reactions_queue = ["⬆️", "⬇️"]
+reactions_song: list[str] = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
+reactions_queue: list[str] = ["⬆️", "⬇️"]
 
-msg_blacklist = "Sorry, you can't use this bot."
+msg_blacklist: str = "Sorry, you can't use this bot."
 
 
-def initialize():
+def initialize() -> None:
     global client_bot, youtube, tree, my_logger

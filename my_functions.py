@@ -1,9 +1,13 @@
+from __future__ import annotations
 import asyncio
-import discord
-from typing import Union
+from typing import Union, TYPE_CHECKING
 
+import discord
 
 import globals_var
+
+if TYPE_CHECKING:
+    from classes.server import Server
 
 
 InteractionChannel = Union[
@@ -18,7 +22,9 @@ InteractionChannel = Union[
 ]
 
 
-async def get_response(interaction: discord.Interaction):
+async def get_response(
+    interaction: discord.Interaction,
+) -> discord.InteractionResponse | discord.Message:
     try:
         return await interaction.original_response()
     except discord.errors.NotFound:
@@ -33,7 +39,7 @@ async def send_by_channel(
 ) -> discord.Message | None:
     if not channel:
         return None
-    delete_after = None if permanent else 60.0
+    delete_after: float | None = None if permanent else 60.0
 
     if not hasattr(channel, "send"):
         return None
@@ -49,7 +55,7 @@ async def send_by_interaction(
     content: str,
     delete_after: float | None = None,
     view: discord.ui.View = discord.utils.MISSING,
-):
+) -> None:
     try:
         await interaction.response.send_message(
             content, delete_after=delete_after, view=view, ephemeral=True
@@ -66,7 +72,9 @@ async def edit_interaction(
     view: discord.ui.View = discord.utils.MISSING,
 ):
     try:
-        response = await get_response(interaction)
+        response: discord.InteractionResponse | discord.Message = await get_response(
+            interaction
+        )
         if isinstance(response, discord.InteractionResponse):
             if response.type is None:
                 await send_by_channel(interaction.channel, content, view=view)
@@ -95,14 +103,16 @@ async def edit_response(
     response: discord.InteractionMessage,
     content: str = discord.utils.MISSING,
     view: discord.ui.View = discord.utils.MISSING,
-):
+) -> None:
     try:
         await response.edit(content=content, view=view)
     except discord.errors.HTTPException:
         pass
 
 
-async def delete_msg(message: discord.Message | discord.InteractionMessage | None):
+async def delete_msg(
+    message: discord.Message | discord.InteractionMessage | None,
+) -> None:
     if message is None or isinstance(message, discord.InteractionResponse):
         return
     try:
@@ -117,34 +127,37 @@ async def disconnect_bot(
     if not guild_id:
         return
 
-    server = globals_var.client_bot.get_server(guild_id)
-    if server.get_is_disconnect():
+    server: Server = globals_var.client_bot.get_server(guild_id)
+    if server.is_disconnected:
         return
-    server.being_disconnect()
-    await server.get_queue_musics().clear_queue(None)
+
+    server.disconnect()
+    await server.track_queue.clear_queue(None)
 
     voice_client.stop()
-    await asyncio.sleep(1.0)  # Wait for the music to stop
+    await asyncio.sleep(1.0)  # Wait for the track to stop
 
     await voice_client.disconnect()
-    await server.disconnect()
+    await server.clear()
 
-    if globals_var.client_bot.get_use_youtube_server_id() == guild_id:
-        globals_var.client_bot.set_use_youtube_server_id(None)
+    if globals_var.client_bot.server_id_using_youtube == guild_id:
+        globals_var.client_bot.server_id_using_youtube = None
 
     globals_var.client_bot.remove_server(guild_id)
 
     globals_var.my_logger.info(f"Bot disconnects to {voice_client.guild.name}.")
 
 
+def user_is_blacklisted(user_id: int) -> bool:
+    return user_id in globals_var.client_bot.blacklist
+
+
 # Not use
-async def add_reaction(interaction: discord.Interaction, reaction):
+async def add_reaction(interaction: discord.Interaction, reaction) -> None:
     try:
-        interaction_message = await interaction.original_response()
+        interaction_message: discord.InteractionMessage = (
+            await interaction.original_response()
+        )
         await interaction_message.add_reaction(reaction)
     except discord.errors.NotFound:
         pass
-
-
-def user_is_blacklisted(user_id: int) -> bool:
-    return user_id in globals_var.client_bot.blacklist

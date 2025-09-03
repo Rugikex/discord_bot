@@ -1,59 +1,69 @@
+from __future__ import annotations
+from io import TextIOWrapper
 import os
-from typing import Dict
+from typing import TYPE_CHECKING
 
-from discord import Client, Intents
-from discord.flags import Intents
+from discord import Client
 
 from classes.server import Server
+
+if TYPE_CHECKING:
+    from discord import Intents
 
 
 class MyClient(Client):
     def __init__(self, *, intents: Intents) -> None:
         super().__init__(intents=intents)
-        self.servers: Dict[int, Server] = {}
-        self.use_youtube_server_id: int | None = None
-        self.blacklist = self._get_blacklist()
+        self._servers: dict[int, Server] = {}
+        self._server_id_using_youtube: int | None = None
+        self._blacklist: set[int] = self._get_blacklist()
 
     def _get_blacklist(self) -> set[int]:
         if not os.path.exists("blacklist.txt"):
             return set()
 
-        with open("blacklist.txt", "r") as file:
-            result = set()
+        file: TextIOWrapper
+        with open("blacklist.txt", "r", encoding="utf-8") as file:
+            result: set[int] = set()
+            line: str
             for line in file.readlines():
                 line = line.strip()
-                if not line:
+                if line == "":
                     continue
                 try:
                     result.add(int(line))
                 except ValueError:
+
                     pass
 
             return result
 
-    def get_server(self, id: int | None) -> Server:
-        if id is None:
+    def get_server(self, server_id: int | None) -> Server:
+        if server_id is None:
             raise Exception("Server not found")
 
-        server = self.servers.get(id)
+        server: Server | None = self._servers.get(server_id)
         if server is None:
             raise Exception("Server not found")
         return server
 
-    def get_use_youtube_server_id(self) -> int | None:
-        return self.use_youtube_server_id
-
-    def set_use_youtube_server_id(self, id: int | None) -> None:
-        self.use_youtube_server_id = id
-
-    def add_server(self, id: int | None) -> None:
-        if id is None:
+    def add_server(self, server_id: int | None) -> None:
+        if server_id is None:
             raise Exception("Server not found")
-        server = Server(id)
-        self.servers[id] = server
+        server: Server = Server(server_id)
+        self._servers[server_id] = server
 
-    def his_using_youtube(self) -> bool:
-        return self.use_youtube_server_id is not None
+    def remove_server(self, server_id: int) -> None:
+        self._servers.pop(server_id, None)
 
-    def remove_server(self, id: int) -> None:
-        self.servers.pop(id, None)
+    @property
+    def server_id_using_youtube(self) -> int | None:
+        return self._server_id_using_youtube
+
+    @server_id_using_youtube.setter
+    def server_id_using_youtube(self, value: int | None) -> None:
+        self._server_id_using_youtube = value
+
+    @property
+    def blacklist(self) -> set[int]:
+        return self._blacklist

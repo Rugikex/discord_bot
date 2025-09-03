@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import discord
 
 import globals_var
@@ -6,62 +9,68 @@ import secret_list
 from globals_var import client_bot, tree, my_logger
 import voice_gestion
 
+if TYPE_CHECKING:
+    from classes.server import Server
+    from classes.track import Track
+    from classes.track_queue import TrackQueue
 
-async def msg_help(interaction: discord.Interaction):
-    content = (
+
+async def msg_help(interaction: discord.Interaction) -> None:
+    content: str = (
         "`clear`: Clear the queue.\n"
         "`disconnect`: Disconnect the bot.\n"
         "`help`: Display this message.\n"
-        "`move position new_position`: Move the 'position' music to 'new_position'.\n"
-        "`nowplaying`: Display the current music.\n"
-        "`pause`: Pause the current music.\n"
+        "`move position new_position`: Move the 'position' track to 'new_position'.\n"
+        "`nowplaying`: Display the current track.\n"
+        "`pause`: Pause the current track.\n"
         "`play`: Play <youtube url/playlist or search terms>.\n"
-        "`play_default`: Play default musics of this server.\n"
-        "`play_next (shuffle)`:Play this music after the current one. (can shuffle new music added)\n"
-        "`play_shuffle`: Play music and shuffle queue.\n"
+        "`play_default`: Play default tracks of this server.\n"
+        "`play_next (shuffle)`:Play this track after the current one. (can shuffle new track added)\n"
+        "`play_shuffle`: Play track and shuffle queue.\n"
         "`queue (number)`: Display the queue.\n"
-        "`remove begin (end)`: Remove `begin` music or [`begin`, `end`] musics.\n"
-        "`resume`: Resume current music.\n"
-        "`shuffle`: Shuffle musics.\n"
-        "`skip`: Skip the current music.\n"
-        "`stop`: Stop current music.\n"
+        "`remove begin (end)`: Remove `begin` track or [`begin`, `end`] tracks.\n"
+        "`resume`: Resume current track.\n"
+        "`shuffle`: Shuffle tracks.\n"
+        "`skip`: Skip the current track.\n"
+        "`stop`: Stop current track.\n"
     )
 
     await my_functions.send_by_channel(interaction.channel, content)
 
 
-async def display_current_music(interaction: discord.Interaction):
-    server = client_bot.get_server(interaction.guild_id)
-    if not server.has_current_music_info():
-        await my_functions.send_by_channel(interaction.channel, "No music.")
+async def display_current_track(interaction: discord.Interaction) -> None:
+    server: Server = client_bot.get_server(interaction.guild_id)
+    if server.current_track is None:
+        await my_functions.send_by_channel(interaction.channel, "No track.")
         return
 
-    current_music_info = server.get_current_music_info()
-    msg_content = (
-        f"Playing {current_music_info.get_music().title}\n[Time] ["
-        f"{current_music_info.get_audio().progress_str}"
-        f" / {current_music_info.get_music().duration}]"
+    current_track: Track = server.current_track
+    msg_content: str = (
+        f"Playing {current_track.track.title}\n[Time] ["
+        f"{current_track.audio.progress_str}"
+        f" / {current_track.track.duration}]"
     )
 
     await my_functions.send_by_channel(interaction.channel, msg_content)
 
 
 @client_bot.event
-async def on_ready():
-    guilds = []
+async def on_ready() -> None:
+    guilds: list[str] = []
     for guild in client_bot.guilds:
         guilds.append(guild.name)
     await client_bot.loop.create_task(tree.sync())
 
-    my_logger.info(f"Logged in as {client_bot.user} to {guilds}.")
+    my_logger.info("Logged in as %s to %s.", client_bot.user, guilds)
 
 
 @client_bot.event
-async def on_voice_state_update(member, before, after):
+async def on_voice_state_update(member, before, after) -> None:
+    """Disconnect the bot if alone in a voice channel or if kicked."""
     voice_client: discord.VoiceClient = discord.utils.get(
         client_bot.voice_clients, guild=member.guild
     )
-    if not voice_client:
+    if voice_client is None:
         return
 
     if member == client_bot.user and before.channel and after.channel:
@@ -92,7 +101,7 @@ async def on_voice_state_update(member, before, after):
 
 
 @tree.command(name="clear", description="Clear the queue.")
-async def self(interaction: discord.Interaction):
+async def self(interaction: discord.Interaction) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -101,16 +110,16 @@ async def self(interaction: discord.Interaction):
             my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
         )
         return
-    server = client_bot.get_server(interaction.guild_id)
-    queue_musics = server.get_queue_musics()
-    await client_bot.loop.create_task(queue_musics.clear_queue(interaction))
+    server: Server = client_bot.get_server(interaction.guild_id)
+    track_queue: TrackQueue = server.track_queue
+    await client_bot.loop.create_task(track_queue.clear_queue(interaction))
     await client_bot.loop.create_task(
         my_functions.send_by_channel(interaction.channel, "The queue is cleared.")
     )
 
 
 @tree.command(name="disconnect", description="Disconnect the bot.")
-async def self(interaction: discord.Interaction):
+async def self(interaction: discord.Interaction) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -123,7 +132,7 @@ async def self(interaction: discord.Interaction):
 
 
 @tree.command(name="help", description="Display commands.")
-async def self(interaction: discord.Interaction):
+async def self(interaction: discord.Interaction) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -135,8 +144,8 @@ async def self(interaction: discord.Interaction):
     await client_bot.loop.create_task(msg_help(interaction))
 
 
-@tree.command(name="loop", description="Loop or unloop the current music.")
-async def self(interaction: discord.Interaction):
+@tree.command(name="loop", description="Loop or unloop the current track.")
+async def self(interaction: discord.Interaction) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -146,7 +155,7 @@ async def self(interaction: discord.Interaction):
         )
         return
 
-    server = client_bot.get_server(interaction.guild_id)
+    server: Server = client_bot.get_server(interaction.guild_id)
     server.switch_looping()
     await client_bot.loop.create_task(
         my_functions.send_by_channel(
@@ -156,8 +165,10 @@ async def self(interaction: discord.Interaction):
     )
 
 
-@tree.command(name="move", description="Move the 'position' music to 'new_position'")
-async def self(interaction: discord.Interaction, position: int, new_position: int):
+@tree.command(name="move", description="Move the 'position' track to 'new_position'")
+async def self(
+    interaction: discord.Interaction, position: int, new_position: int
+) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -166,28 +177,15 @@ async def self(interaction: discord.Interaction, position: int, new_position: in
             my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
         )
         return
-    server = client_bot.get_server(interaction.guild_id)
-    queue_musics = server.get_queue_musics()
+    server: Server = client_bot.get_server(interaction.guild_id)
+    track_queue: TrackQueue = server.track_queue
     await client_bot.loop.create_task(
-        queue_musics.move_music(interaction, position, new_position)
+        track_queue.move_track(interaction, position, new_position)
     )
 
 
-@tree.command(name="nowplaying", description="Display the current music.")
-async def self(interaction: discord.Interaction):
-    await client_bot.loop.create_task(
-        my_functions.send_by_interaction(interaction, "Request received")
-    )
-    if my_functions.user_is_blacklisted(interaction.user.id):
-        await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
-        )
-        return
-    await client_bot.loop.create_task(display_current_music(interaction))
-
-
-@tree.command(name="pause", description="Pause the current music.")
-async def self(interaction: discord.Interaction):
+@tree.command(name="nowplaying", description="Display the current track.")
+async def self(interaction: discord.Interaction) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -196,13 +194,26 @@ async def self(interaction: discord.Interaction):
             my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
         )
         return
-    await client_bot.loop.create_task(voice_gestion.pause_music(interaction))
+    await client_bot.loop.create_task(display_current_track(interaction))
+
+
+@tree.command(name="pause", description="Pause the current track.")
+async def self(interaction: discord.Interaction) -> None:
+    await client_bot.loop.create_task(
+        my_functions.send_by_interaction(interaction, "Request received")
+    )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
+    await client_bot.loop.create_task(voice_gestion.pause_track(interaction))
 
 
 @tree.command(name="play", description="Play youtube url/playlist or search terms.")
 async def self(
-    interaction: discord.Interaction, music: str, position: int | None = None
-):
+    interaction: discord.Interaction, track: str, position: int | None = None
+) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -212,14 +223,14 @@ async def self(
         )
         return
     await client_bot.loop.create_task(
-        voice_gestion.play(interaction, music, position=position)
+        voice_gestion.play(interaction, track, position=position)
     )
 
 
-@tree.command(name="play_default", description="Play default musics of this server.")
+@tree.command(name="play_default", description="Play default tracks of this server.")
 async def self(
     interaction: discord.Interaction, shuffle: bool = False, position: int | None = None
-):
+) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -228,10 +239,10 @@ async def self(
             my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
         )
         return
-    if interaction.guild_id not in secret_list.default_musics:
+    if interaction.guild_id not in secret_list.default_tracks:
         await client_bot.loop.create_task(
             my_functions.send_by_channel(
-                interaction.channel, "No default music for this server"
+                interaction.channel, "No default track for this server"
             )
         )
         return
@@ -239,7 +250,7 @@ async def self(
     await client_bot.loop.create_task(
         voice_gestion.play(
             interaction,
-            secret_list.default_musics[interaction.guild_id],
+            secret_list.default_tracks[interaction.guild_id],
             shuffle=shuffle,
             position=position,
         )
@@ -248,9 +259,11 @@ async def self(
 
 @tree.command(
     name="play_next",
-    description="Play this music after the current one. (can shuffle new music added)",
+    description="Play this track after the current one. (can shuffle new track added)",
 )
-async def self(interaction: discord.Interaction, music: str, shuffle: bool = False):
+async def self(
+    interaction: discord.Interaction, track: str, shuffle: bool = False
+) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -260,12 +273,12 @@ async def self(interaction: discord.Interaction, music: str, shuffle: bool = Fal
         )
         return
     await client_bot.loop.create_task(
-        voice_gestion.play(interaction, music, position=1, shuffle=shuffle)
+        voice_gestion.play(interaction, track, position=1, shuffle=shuffle)
     )
 
 
-@tree.command(name="play_shuffle", description="Play and shuffle musics.")
-async def self(interaction: discord.Interaction, music: str):
+@tree.command(name="play_shuffle", description="Play and shuffle tracks.")
+async def self(interaction: discord.Interaction, track: str) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -275,12 +288,12 @@ async def self(interaction: discord.Interaction, music: str):
         )
         return
     await client_bot.loop.create_task(
-        voice_gestion.play(interaction, music, shuffle=True)
+        voice_gestion.play(interaction, track, shuffle=True)
     )
 
 
 @tree.command(name="queue", description="Display the queue.")
-async def self(interaction: discord.Interaction, page: int = 1):
+async def self(interaction: discord.Interaction, page: int = 1) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -289,15 +302,15 @@ async def self(interaction: discord.Interaction, page: int = 1):
             my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
         )
         return
-    server = client_bot.get_server(interaction.guild_id)
-    queue_musics = server.get_queue_musics()
-    await client_bot.loop.create_task(queue_musics.get_queue(interaction, page))
+    server: Server = client_bot.get_server(interaction.guild_id)
+    track_queue = server.track_queue
+    await client_bot.loop.create_task(track_queue.get_queue(interaction, page))
 
 
 @tree.command(
-    name="remove", description="Remove 'begin' music or ['begin', 'end'] musics."
+    name="remove", description="Remove 'begin' track or ['begin', 'end'] tracks."
 )
-async def self(interaction: discord.Interaction, begin: int, end: int = None):
+async def self(interaction: discord.Interaction, begin: int, end: int = None) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -315,29 +328,16 @@ async def self(interaction: discord.Interaction, begin: int, end: int = None):
     if end is None:
         end = begin
 
-    server = client_bot.get_server(interaction.guild_id)
-    queue_musics = server.get_queue_musics()
+    server: Server = client_bot.get_server(interaction.guild_id)
+    track_queue: TrackQueue = server.track_queue
 
     await client_bot.loop.create_task(
-        queue_musics.remove_musics(interaction, begin, end)
+        track_queue.remove_tracks(interaction, begin, end)
     )
 
 
-@tree.command(name="resume", description="Resume the current music.")
-async def self(interaction: discord.Interaction):
-    await client_bot.loop.create_task(
-        my_functions.send_by_interaction(interaction, "Request received")
-    )
-    if my_functions.user_is_blacklisted(interaction.user.id):
-        await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
-        )
-        return
-    await client_bot.loop.create_task(voice_gestion.resume_music(interaction))
-
-
-@tree.command(name="shuffle", description="Shuffle musics.")
-async def self(interaction: discord.Interaction):
+@tree.command(name="resume", description="Resume the current track.")
+async def self(interaction: discord.Interaction) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -346,18 +346,31 @@ async def self(interaction: discord.Interaction):
             my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
         )
         return
-    server = client_bot.get_server(interaction.guild_id)
-    queue_musics = server.get_queue_musics()
-    await client_bot.loop.create_task(queue_musics.shuffle_queue(interaction))
+    await client_bot.loop.create_task(voice_gestion.resume_track(interaction))
+
+
+@tree.command(name="shuffle", description="Shuffle tracks.")
+async def self(interaction: discord.Interaction) -> None:
+    await client_bot.loop.create_task(
+        my_functions.send_by_interaction(interaction, "Request received")
+    )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+        )
+        return
+    server: Server = client_bot.get_server(interaction.guild_id)
+    track_queue: TrackQueue = server.track_queue
+    await client_bot.loop.create_task(track_queue.shuffle_queue(interaction))
     await client_bot.loop.create_task(
         my_functions.send_by_channel(interaction.channel, "The queue is shuffled.")
     )
 
 
 @tree.command(
-    name="skip", description="Skip the current music or first 'number' musics."
+    name="skip", description="Skip the current track or first 'number' tracks."
 )
-async def self(interaction: discord.Interaction, number: int = 1):
+async def self(interaction: discord.Interaction, number: int = 1) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -372,11 +385,11 @@ async def self(interaction: discord.Interaction, number: int = 1):
         )
         return
 
-    await client_bot.loop.create_task(voice_gestion.skip_music(interaction, number))
+    await client_bot.loop.create_task(voice_gestion.skip_track(interaction, number))
 
 
-@tree.command(name="stop", description="Stop music.")
-async def self(interaction: discord.Interaction):
+@tree.command(name="stop", description="Stop track.")
+async def self(interaction: discord.Interaction) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
@@ -386,9 +399,9 @@ async def self(interaction: discord.Interaction):
         )
         return
 
-    server = client_bot.get_server(interaction.guild_id)
-    queue_musics = server.get_queue_musics()
-    await client_bot.loop.create_task(queue_musics.stop_music(interaction))
+    server: Server = client_bot.get_server(interaction.guild_id)
+    track_queue: TrackQueue = server.track_queue
+    await client_bot.loop.create_task(track_queue.stop_track(interaction))
 
 
 def main():
