@@ -5,8 +5,7 @@ from typing import TYPE_CHECKING
 import discord
 from googleapiclient.errors import HttpError
 import isodate
-import pytubefix
-import pytubefix.exceptions
+from yt_dlp import YoutubeDL
 
 from classes.track import Track
 import globals_var
@@ -16,17 +15,92 @@ if TYPE_CHECKING:
     from classes.server import Server
 
 
-def create_track(yt_obj: pytubefix.YouTube) -> Track:
-    title: str = yt_obj.title
-    duration: datetime.timedelta | None = None
-    try:
-        duration = datetime.timedelta(seconds=yt_obj.length)
-    except TypeError:
-        pass
-    url: str = yt_obj.watch_url
-    return Track(title, duration, url)
+def specific_search(query: str) -> list[Track]:
+    ydl_opts: dict = {
+        "quiet": True,
+        "extract_flat": True,
+    }
+
+    with YoutubeDL(ydl_opts) as ydl:
+        search_url: str = f"ytsearch5:{query}"
+        info: dict = ydl.extract_info(search_url, download=False)
+
+    tracks: list[Track] = []
+    for entry in info.get("entries", []):
+        if entry.get("duration") is None:
+            continue
+        tracks.append(
+            Track(
+                entry.get("title", ""),
+                datetime.timedelta(seconds=entry.get("duration", 0)),
+                entry.get("url", ""),
+            )
+        )
+
+    return tracks
 
 
+async def single_link(video_url: str) -> list[Track] | None:
+    ydl_opts = {"quiet": True, "extract_flat": True}
+
+    with YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(video_url, download=False)
+
+    if info.get("duration") is None:
+        return None
+    return [
+        Track(
+            info.get("title", ""),
+            datetime.timedelta(seconds=info.get("duration", 0)),
+            info.get("webpage_url", video_url),
+        )
+    ]
+
+
+async def playlist_link(
+    interaction: discord.Interaction, playlist_url: str
+) -> list[Track]:
+    # if globals_var.client_bot.server_id_using_youtube is not None:
+    #     return [None]
+    # globals_var.client_bot.server_id_using_youtube = interaction.guild_id
+
+    server: Server = globals_var.client_bot.get_server(interaction.guild_id)
+    if server is None:
+        return []
+    message: discord.Message = server.loading_playlist_message
+
+    ydl_opts = {"quiet": True, "extract_flat": True}
+
+    def extract_info(playlist_url: str) -> dict:
+        with YoutubeDL(ydl_opts) as ydl:
+            info: dict = ydl.extract_info(playlist_url, download=False)
+        return info
+
+    message = await my_functions.edit_message(message, content="Loading playlist...")
+    server.loading_playlist_message = message
+    info: dict = await globals_var.client_bot.loop.run_in_executor(
+        None, extract_info, playlist_url
+    )
+
+    tracks: list[Track] = []
+    for entry in info.get("entries", []):
+        if entry.get("duration") is None:
+            continue
+        track = Track(
+            entry.get("title", ""),
+            datetime.timedelta(seconds=entry.get("duration", 0)),
+            entry.get("url", ""),
+        )
+        tracks.append(track)
+
+    # globals_var.client_bot.server_id_using_youtube = None
+    await my_functions.delete_msg(message)
+    server.loading_playlist_message = None
+
+    return tracks
+
+
+# Not use
 def create_tracks(video_ids: str) -> list[Track]:
     res: list[Track] = []
     request = globals_var.youtube.videos().list(
@@ -46,72 +120,6 @@ def create_tracks(video_ids: str) -> list[Track]:
     return res
 
 
-def specific_search(context: str) -> list[Track]:
-    search: pytubefix.Search = pytubefix.Search(context)
-    res: list[Track] = []
-    results: list[pytubefix.YouTube] = search.videos
-    for i in range(min(5, len(results))):
-        res.append(create_track(results[i]))
-    return res
-
-
-async def single_link(link: str) -> list[Track]:
-    try:
-        obj: pytubefix.YouTube = await globals_var.client_bot.loop.run_in_executor(
-            None, pytubefix.YouTube, link
-        )
-    except pytubefix.exceptions.RegexMatchError:
-        return []
-
-    return [create_track(obj)]
-
-
-async def playlist_link(
-    interaction: discord.Interaction, link: str
-) -> list[Track] | list[None] | None:
-    if globals_var.client_bot.server_id_using_youtube is not None:
-        return [None]
-
-    globals_var.client_bot.server_id_using_youtube = interaction.guild_id
-    urls = []
-    playlist: pytubefix.Playlist = await globals_var.client_bot.loop.run_in_executor(
-        None, pytubefix.Playlist, link
-    )
-    pytubefix_urls: pytubefix.helpers.DeferredGeneratorList = playlist.video_urls
-    # pytubefix.helpers.DeferredGeneratorList don't support slicing we need to convert it to a list
-    await globals_var.client_bot.loop.run_in_executor(None, urls.extend, pytubefix_urls)
-    numbers_new_tracks: int = len(urls)
-    res: list[Track] = []
-    server: Server = globals_var.client_bot.get_server(interaction.guild_id)
-    message: discord.Message = server.loading_playlist_message
-    while urls:
-        voice_client: discord.VoiceClient = discord.utils.get(
-            globals_var.client_bot.voice_clients, guild=interaction.guild
-        )
-        if voice_client is None:
-            return None
-        message = await my_functions.edit_message(
-            message, content=f"Loading playlist: {len(res)}/{numbers_new_tracks}."
-        )
-        video_ids = list(
-            map(lambda n: n.split("https://www.youtube.com/watch?v=", 1)[1], urls[:50])
-        )
-        res.extend(
-            await globals_var.client_bot.loop.run_in_executor(
-                None, create_tracks, video_ids
-            )
-        )
-        urls = urls[50:]
-    globals_var.client_bot.server_id_using_youtube = None
-    message = await my_functions.edit_message(
-        message, content=f"Loading playlist: {len(res)}/{numbers_new_tracks}."
-    )
-    await my_functions.delete_msg(message)
-    server.loading_playlist_message = None
-    return res
-
-
-# Not use
 # Faster than playlist_link but costs twice in YouTube API units
 def playlist_link2(link: str) -> list[Track]:
     playlist_id: str = link.split("list=", 1)[1].split("&", 1)[0]

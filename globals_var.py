@@ -30,45 +30,66 @@ class ColorFormatter(logging.Formatter):
         return f"{self.GRAY}{original_time}{self.RESET}"
 
     def format(self, record: logging.LogRecord) -> str:
+        # Align levelname to 8 characters for consistent formatting
+        levelname_raw: str = record.levelname
+        levelname_aligned: str = f"{levelname_raw:<8}"
+        # Then apply color
         record.levelname = (
-            f"{self.LEVEL_COLOR.get(record.levelno)}{record.levelname}{self.RESET}"
+            f"{self.LEVEL_COLOR.get(record.levelno)}{levelname_aligned}{self.RESET}"
         )
+
         record.name = f"{self.GREEN}{record.name}{self.RESET}"
         return super().format(record)
 
 
-class LoggerYdl:
-    """
-    Logger for yt-dlp
-    Only print error
-    """
+class YDLLogger:
+    def __init__(self) -> None:
+        self.logger: logging.Logger = logging.getLogger("yt-dlp")
+        self.logger.setLevel(logging.WARNING)
 
-    def debug(self, msg):
-        # For compatibility with youtube-dl, both debug and info are passed into debug
+        # To avoid duplicates if the class is instantiated multiple times
+        if self.logger.handlers == []:
+            handler: logging.StreamHandler = logging.StreamHandler()
+            formatter: ColorFormatter = ColorFormatter(
+                "%(asctime)s %(levelname)s %(name)s %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+        else:
+            print("YDLLogger already has handlers")
+
+    def debug(self, msg: Any) -> None:
+        # For compatibility with yt-dlp, both debug and info are passed into debug
         # You can distinguish them by the prefix '[debug] '
         if msg.startswith("[debug] "):
-            pass
+            self.logger.debug(msg)
         else:
             self.info(msg)
 
-    def info(self, msg):
-        pass
+    def info(self, msg: Any) -> None:
+        self.logger.info(msg)
 
-    def warning(self, msg):
-        pass
+    def warning(self, msg: Any) -> None:
+        self.logger.warning(msg)
 
-    def error(self, msg):
-        print(msg)
+    def error(self, msg: Any) -> None:
+        # Ignore "Video unavailable" errors
+        if "Video unavailable" in msg:
+            return
+        # Remove "ERROR: " prefix
+        msg = msg[msg.index(" [") + 1 :] if " [" in msg else msg
+        self.logger.error(msg)
 
 
 logging.getLogger("discord.player").setLevel(logging.WARNING)
 logging.getLogger("discord.voice_client").setLevel(logging.WARNING)
-logging.getLogger("pytubefix").setLevel(logging.ERROR)
+logging.getLogger("discord.voice_state").setLevel(logging.WARNING)
 
 my_logger: logging.Logger = logging.getLogger("discord_bot")
 handler: logging.StreamHandler = logging.StreamHandler()
 formatter: ColorFormatter = ColorFormatter(
-    "%(asctime)s %(levelname)s     %(name)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    "%(asctime)s %(levelname)s %(name)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
 )
 handler.setFormatter(formatter)
 my_logger.addHandler(handler)
@@ -80,8 +101,9 @@ ydl_opts = {
     "extract-audio": True,
     "format": "bestaudio",
     "fps": None,
-    "logger": LoggerYdl(),
+    "logger": YDLLogger(),
     "youtube_include_dash_manifest": False,
+    "ignoreerrors": True,
 }
 
 load_dotenv()

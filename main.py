@@ -70,10 +70,24 @@ async def on_voice_state_update(member, before, after) -> None:
     voice_client: discord.VoiceClient = discord.utils.get(
         client_bot.voice_clients, guild=member.guild
     )
-    if voice_client is None:
+    if voice_client is None or before.channel is None:
         return
 
-    if member == client_bot.user and before.channel and after.channel:
+    if (
+        member != client_bot.user
+        and client_bot.user in before.channel.members
+        and len(before.channel.members) == 1
+    ):
+        client_bot.loop.create_task(
+            my_functions.disconnect_bot(voice_client, member.guild.id)
+        )
+        return
+
+    if (
+        member == client_bot.user
+        and after.channel
+        and before.channel is not after.channel
+    ):
         if len(after.channel.members) == 1:
             client_bot.loop.create_task(
                 my_functions.disconnect_bot(voice_client, member.guild.id)
@@ -83,17 +97,10 @@ async def on_voice_state_update(member, before, after) -> None:
         return
 
     if (
-        member != client_bot.user
-        and before.channel
-        and client_bot.user in before.channel.members
-        and len(before.channel.members) == 1
+        member == client_bot.user
+        and not after.channel
+        and len(before.channel.members) != 0
     ):
-        client_bot.loop.create_task(
-            my_functions.disconnect_bot(voice_client, member.guild.id)
-        )
-        return
-
-    if member == client_bot.user and before.channel and not after.channel:
         client_bot.loop.create_task(
             my_functions.disconnect_bot(voice_client, member.guild.id)
         )

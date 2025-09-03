@@ -48,7 +48,9 @@ async def send_by_channel(
         return None
 
     try:
-        return await channel.send(content, delete_after=delete_after, view=view, embed=embed, file=file)
+        return await channel.send(
+            content, delete_after=delete_after, view=view, embed=embed, file=file
+        )
     except discord.errors.HTTPException:
         return None
 
@@ -129,13 +131,14 @@ async def delete_msg(
 async def disconnect_bot(
     voice_client: discord.VoiceClient, guild_id: int | None
 ) -> None:
-    if not guild_id:
+    if guild_id is None:
         return
 
     server: Server = globals_var.client_bot.get_server(guild_id)
     if server.is_disconnected:
         return
 
+    globals_var.client_bot.remove_server(guild_id)
     server.disconnect()
     await server.track_queue.clear_queue(None)
 
@@ -147,8 +150,6 @@ async def disconnect_bot(
 
     if globals_var.client_bot.server_id_using_youtube == guild_id:
         globals_var.client_bot.server_id_using_youtube = None
-
-    globals_var.client_bot.remove_server(guild_id)
 
     globals_var.my_logger.info(f"Bot disconnects to {voice_client.guild.name}.")
 
@@ -162,18 +163,19 @@ def create_embed(track: Track, is_looping: bool) -> tuple[discord.Embed, discord
     youtube_logo_name: str = "youtube-logo.png"
 
     embed: discord.Embed = discord.Embed(
-        title=track.title,
-        url=track.link,
-        color=discord.Color.red()
+        title=track.title, url=track.link, color=discord.Color.red()
     )
 
     # TODO embed.set_footer(text="Requested by user")
     embed.set_author(name="Playing", icon_url=f"attachment://{youtube_logo_name}")
     loop_str: str = "✔️" if is_looping else "❌"
     embed.description = f"Duration: {track.duration}\nLoop: {loop_str}"
-    file: discord.File = discord.File(f"assets/{youtube_logo_name}", filename=youtube_logo_name)
+    file: discord.File = discord.File(
+        f"assets/{youtube_logo_name}", filename=youtube_logo_name
+    )
 
     return embed, file
+
 
 # Not use
 async def add_reaction(interaction: discord.Interaction, reaction) -> None:

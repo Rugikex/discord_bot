@@ -54,17 +54,12 @@ class TrackQueue:
         res: datetime.timedelta = datetime.timedelta(0)
         item: Track
         for item in self._tracks:
-            if isinstance(item.duration, datetime.timedelta):
-                res += item.duration
+            res += item.duration
 
         server: Server = globals_var.client_bot.get_server(guild_id)
         current_track: CurrentTrack | None = server.current_track
         if current_track is not None:
-            current_track_duration: datetime.timedelta | str = (
-                current_track.track.duration
-            )
-            if isinstance(current_track_duration, datetime.timedelta):
-                res += current_track_duration
+            res += current_track.track.duration
             res -= current_track.audio.progress_datetime
 
         return res - datetime.timedelta(microseconds=res.microseconds)

@@ -141,10 +141,10 @@ async def check_voice_client(
 
 
 async def client_is_disconnected(interaction: discord.Interaction) -> bool:
-    voice_client: discord.VoiceClient = discord.utils.get(
+    voice_client: discord.VoiceClient | None = discord.utils.get(
         globals_var.client_bot.voice_clients, guild=interaction.guild
     )
-    if not voice_client:
+    if voice_client is None:
         return True
 
     return False

@@ -6,13 +6,13 @@ if TYPE_CHECKING:
 
 
 class Track:
-    def __init__(self, title: str, duration: timedelta | None, link: str):
-        self._title = title
-        self._duration = duration if duration is not None else "???"
-        self._link = link
+    def __init__(self, title: str, duration: timedelta, link: str):
+        self._title: str = title
+        self._duration: timedelta = duration
+        self._link: str = link
 
     def __str__(self) -> str:
-        return f"{self.title} ({self.duration})"
+        return f"{self._title} ({self._duration})"
 
     @property
     def title(self) -> str:

@@ -43,7 +43,11 @@ class Server:
         embed, file = my_functions.create_embed(track, self._is_looping)
         if self._current_track is None:
             message = await my_functions.send_by_channel(
-                interaction.channel, "", permanent=True, embed=embed, file=file,
+                interaction.channel,
+                "",
+                permanent=True,
+                embed=embed,
+                file=file,
             )
             # message = await my_functions.send_by_channel(
             #     interaction.channel, f"Now playing {track}.", permanent=True
