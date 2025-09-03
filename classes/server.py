@@ -37,10 +37,17 @@ class Server:
         track: Track,
         audio: AudioSourceTracked,
     ) -> None:
+        message: discord.Message | None
+        embed: discord.Embed
+        file: discord.File
+        embed, file = my_functions.create_embed(track, self._is_looping)
         if self._current_track is None:
             message = await my_functions.send_by_channel(
-                interaction.channel, f"Now playing {track}.", permanent=True
+                interaction.channel, "", permanent=True, embed=embed, file=file,
             )
+            # message = await my_functions.send_by_channel(
+            #     interaction.channel, f"Now playing {track}.", permanent=True
+            # )
             self._current_track = CurrentTrack(track, message, audio)
             return
 
@@ -55,23 +62,23 @@ class Server:
         except discord.errors.Forbidden:
             last_message = None
 
-        message: discord.Message | None
         if (
             last_message is not None
             and self._current_track.message is not None
             and last_message.id != self._current_track.message.id
         ):
             await self._current_track.delete_message()
+
             message = await my_functions.send_by_channel(
-                interaction.channel, f"Now playing {track}.", permanent=True
+                interaction.channel, "", permanent=True, embed=embed, file=file
             )
         elif self._current_track.message is not None:
             message = await my_functions.edit_message(
-                self._current_track.message, f"Now playing {track}."
+                self._current_track.message, "", embed=embed
             )
         else:
             message = await my_functions.send_by_channel(
-                interaction.channel, f"Now playing {track}.", permanent=True
+                interaction.channel, "", permanent=True, embed=embed, file=file
             )
         self._current_track.update(track, message, audio)
 

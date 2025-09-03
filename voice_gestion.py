@@ -321,10 +321,10 @@ async def play(
     message: discord.Message | None = None
     tracks: list[Track] | list[None] | None = None
     if re.match(
-        "^((https://)?(www\.|track\.)?(youtube|youtu.be)\.com/playlist\?list=.+)",
+        "^((https://)?(www\.|music\.)?(youtube|youtu.be)\.com/playlist\?list=.+)",
         content,
     ) or re.match(
-        "^((https://)?(www\.|track\.)?(youtube|youtu.be)\.com/watch\?v=.+&list=[^&]+)",
+        "^((https://)?(www\.|music\.)?(youtube|youtu.be)\.com/watch\?v=.+&list=[^&]+)",
         content,
     ):
         message = await my_functions.send_by_channel(
@@ -333,7 +333,7 @@ async def play(
         server.loading_playlist_message = message
         tracks = await youtube_requests.playlist_link(interaction, content)
     elif re.match(
-        "^((https://)?(www\.|track\.)?(youtube|youtu.be)(\.com)?/(watch\?v=)?.+)",
+        "^((https://)?(www\.|music\.)?(youtube|youtu.be)(\.com)?/(watch\?v=)?.+)",
         content,
     ):
         await my_functions.send_by_channel(interaction.channel, "Loading track...")

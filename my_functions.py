@@ -8,6 +8,7 @@ import globals_var
 
 if TYPE_CHECKING:
     from classes.server import Server
+    from classes.track import Track
 
 
 InteractionChannel = Union[
@@ -36,8 +37,10 @@ async def send_by_channel(
     content: str,
     permanent: bool = False,
     view: discord.ui.View | None = None,
+    embed: discord.Embed | None = None,
+    file: discord.File | None = None,
 ) -> discord.Message | None:
-    if not channel:
+    if channel is None:
         return None
     delete_after: float | None = None if permanent else 60.0
 
@@ -45,7 +48,7 @@ async def send_by_channel(
         return None
 
     try:
-        return await channel.send(content, delete_after=delete_after, view=view)
+        return await channel.send(content, delete_after=delete_after, view=view, embed=embed, file=file)
     except discord.errors.HTTPException:
         return None
 
@@ -90,13 +93,15 @@ async def edit_message(
     message: discord.Message | None,
     content: str = discord.utils.MISSING,
     view: discord.ui.View = discord.utils.MISSING,
+    embed: discord.Embed | None = discord.utils.MISSING,
+    # file: discord.File | None = discord.utils.MISSING,
 ) -> discord.Message | None:
-    if not message:
+    if message is None:
         return None
     try:
-        return await message.edit(content=content, view=view)
+        return await message.edit(content=content, view=view, embed=embed)
     except discord.errors.HTTPException:
-        return await send_by_channel(message.channel, content, view=view)
+        return await send_by_channel(message.channel, content, view=view, embed=embed)
 
 
 async def edit_response(
@@ -151,6 +156,24 @@ async def disconnect_bot(
 def user_is_blacklisted(user_id: int) -> bool:
     return user_id in globals_var.client_bot.blacklist
 
+
+def create_embed(track: Track, is_looping: bool) -> tuple[discord.Embed, discord.File]:
+    """Create a discord embed and a discord file with the youtube logo."""
+    youtube_logo_name: str = "youtube-logo.png"
+
+    embed: discord.Embed = discord.Embed(
+        title=track.title,
+        url=track.link,
+        color=discord.Color.red()
+    )
+
+    # TODO embed.set_footer(text="Requested by user")
+    embed.set_author(name="Playing", icon_url=f"attachment://{youtube_logo_name}")
+    loop_str: str = "✔️" if is_looping else "❌"
+    embed.description = f"Duration: {track.duration}\nLoop: {loop_str}"
+    file: discord.File = discord.File(f"assets/{youtube_logo_name}", filename=youtube_logo_name)
+
+    return embed, file
 
 # Not use
 async def add_reaction(interaction: discord.Interaction, reaction) -> None:
