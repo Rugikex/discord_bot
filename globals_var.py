@@ -108,13 +108,13 @@ load_dotenv()
 
 discord_key: str | None = os.getenv("DISCORD_KEY")
 if discord_key is None:
-    raise Exception("No DISCORD_KEY find")
+    raise KeyError("No DISCORD_KEY find")
 client_bot: MyClient = MyClient(intents=discord.Intents.all())
 tree: discord.app_commands.CommandTree = discord.app_commands.CommandTree(client_bot)
 
 youtube_key: str | None = os.getenv("YOUTUBE_KEY")
 if youtube_key is None:
-    raise Exception("No YOUTUBE_KEY find")
+    raise KeyError("No YOUTUBE_KEY find")
 youtube: Any = build("youtube", "v3", developerKey=youtube_key)
 
 skip_seconds: float = 10.0

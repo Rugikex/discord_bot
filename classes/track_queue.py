@@ -49,7 +49,7 @@ class TrackQueue:
 
     def get_queue_total_time(self, guild_id: int | None) -> datetime.timedelta:
         if guild_id is None:
-            raise Exception("Server not found")
+            raise ValueError("Server ID must not be None")
 
         res: datetime.timedelta = datetime.timedelta(0)
         item: Track
