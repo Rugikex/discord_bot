@@ -23,6 +23,19 @@ FFMPEG_OPTIONS = {
     "options": "-vn -loglevel quiet",
 }
 
+YOUTUBE_PLAYLIST_REGEX: re.Pattern[str] = re.compile(
+    r"^(https://)?(www\.|music\.)?(youtube\.com|youtu\.be)/"
+    r"((playlist\?list=[^&]+)|(watch\?v=[^&]+&list=[^&]+))"
+)
+
+YOUTUBE_VIDEO_REGEX: re.Pattern[str] = re.compile(
+    r"^(https://)?(www\.|music\.)?(youtube\.com/watch\?v=[^&]+|youtu\.be/[^?&]+)"
+)
+
+YOUTUBE_VIDEO_WITH_LIST_REGEX: re.Pattern[str] = re.compile(
+    r"^(https://)?(www\.|music\.)?(youtube\.com/watch\?v=([^&\n]+)(&list=[^&\n]+)?(&index=[^&\n]+)?|youtu\.be/([^?&\n]+))"
+)
+
 
 async def user_is_connected(interaction: discord.Interaction) -> bool:
     if isinstance(interaction.user, discord.User) or interaction.user.voice is None:
@@ -319,41 +332,38 @@ async def play(
         position = None
 
     message: discord.Message | None = None
-    tracks: list[Track] | list[None] | None = None
-    if re.match(
-        "^((https://)?(www\.|music\.)?(youtube|youtu.be)\.com/playlist\?list=.+)",
-        content,
-    ) or re.match(
-        "^((https://)?(www\.|music\.)?(youtube|youtu.be)\.com/watch\?v=.+&list=[^&]+)",
-        content,
-    ):
+    tracks: list[Track]
+    if YOUTUBE_PLAYLIST_REGEX.search(content) is not None:
         message = await my_functions.send_by_channel(
-            interaction.channel, "Loading playlist..."
+            interaction.channel, "Loading playlist...", permanent=True
         )
         server.loading_playlist_message = message
         tracks = await youtube_requests.playlist_link(interaction, content)
-    elif re.match(
-        "^((https://)?(www\.|music\.)?(youtube|youtu.be)(\.com)?/(watch\?v=)?.+)",
-        content,
-    ):
-        await my_functions.send_by_channel(interaction.channel, "Loading track...")
+    elif YOUTUBE_VIDEO_REGEX.search(content) is not None:
+        message = await my_functions.send_by_channel(
+            interaction.channel, "Loading track...", permanent=True
+        )
         tracks = await youtube_requests.single_link(content)
+        await my_functions.delete_msg(message)
     else:
         if server.search_results is not None:
             await my_functions.delete_msg(server.search_results.message)
 
         message = await my_functions.send_by_channel(
-            interaction.channel, f"Searching for track related to {content}."
+            interaction.channel,
+            f"Searching for track related to {content}.",
+            permanent=True,
         )
 
         searches: list[Track] = youtube_requests.specific_search(content)
 
         if await client_is_disconnected(interaction):
+            await my_functions.delete_msg(message)
             return
 
         if not searches:
             await my_functions.edit_message(
-                message, content=f'No track found for "{content}".'
+                message, content=f'No track found for "{content}".', delete_after=10.0
             )
             return
 
@@ -376,36 +386,23 @@ async def play(
     if await client_is_disconnected(interaction):
         return
 
-    if tracks == [None]:
-        await my_functions.send_by_channel(
-            interaction.channel,
-            "The bot is already looking for another playlist. Please wait and retry.",
-        )
-        return
-
-    if not tracks and re.match(
-        "^(https://)?www\.youtube\.com/watch\?v=[^&\n]+((&list=[^&\n]+)(&index=[^&\n]+)?|(&index=[^&\n]+)("
-        "&list=[^&\n]+)?)",
-        content,
-    ):
+    if len(track) == 0 and YOUTUBE_VIDEO_WITH_LIST_REGEX.search(content) is not None:
         match: re.Match[str] | None = re.match(
             "^(https://)?(www\.youtube\.com/watch\?v=[^&\n]+)((&list=[^&\n]+)(&index=[^&\n]+)?|(&index=[^&\n]+)(&list=["
             "^&\n]+)?)",
             content,
         )
 
+        match: re.Match[str] | None = YOUTUBE_VIDEO_WITH_LIST_REGEX.match(content)
+
         await my_functions.send_by_channel(
             interaction.channel, "No playlist found, loading track..."
         )
         if match:
-            index: int
-            if match.lastindex:
-                index = match.lastindex - 1
-            else:
-                index = 0
-            tracks = await youtube_requests.single_link(match[index])
+            video_id: str = match[4] if match[4] is not None else match[7]
+            tracks = await youtube_requests.single_link(f"https://youtu.be/{video_id}")
 
-    if not tracks:
+    if len(tracks) == 0:
         await my_functions.send_by_channel(
             interaction.channel, f'No audio found for "{content}".'
         )

@@ -94,14 +94,16 @@ async def edit_interaction(
 async def edit_message(
     message: discord.Message | None,
     content: str = discord.utils.MISSING,
-    view: discord.ui.View = discord.utils.MISSING,
     embed: discord.Embed | None = discord.utils.MISSING,
-    # file: discord.File | None = discord.utils.MISSING,
+    delete_after: float | None = None,
+    view: discord.ui.View = discord.utils.MISSING,
 ) -> discord.Message | None:
     if message is None:
         return None
     try:
-        return await message.edit(content=content, view=view, embed=embed)
+        return await message.edit(
+            content=content, embed=embed, delete_after=delete_after, view=view
+        )
     except discord.errors.HTTPException:
         return await send_by_channel(message.channel, content, view=view, embed=embed)
 

@@ -40,14 +40,14 @@ def specific_search(query: str) -> list[Track]:
     return tracks
 
 
-async def single_link(video_url: str) -> list[Track] | None:
+async def single_link(video_url: str) -> list[Track]:
     ydl_opts = {"quiet": True, "extract_flat": True}
 
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(video_url, download=False)
 
     if info.get("duration") is None:
-        return None
+        return []
     return [
         Track(
             info.get("title", ""),
@@ -67,7 +67,6 @@ async def playlist_link(
     server: Server = globals_var.client_bot.get_server(interaction.guild_id)
     if server is None:
         return []
-    message: discord.Message = server.loading_playlist_message
 
     ydl_opts = {"quiet": True, "extract_flat": True}
 
@@ -76,8 +75,6 @@ async def playlist_link(
             info: dict = ydl.extract_info(playlist_url, download=False)
         return info
 
-    message = await my_functions.edit_message(message, content="Loading playlist...")
-    server.loading_playlist_message = message
     info: dict = await globals_var.client_bot.loop.run_in_executor(
         None, extract_info, playlist_url
     )
@@ -94,7 +91,7 @@ async def playlist_link(
         tracks.append(track)
 
     # globals_var.client_bot.server_id_using_youtube = None
-    await my_functions.delete_msg(message)
+    await my_functions.delete_msg(server.loading_playlist_message)
     server.loading_playlist_message = None
 
     return tracks
