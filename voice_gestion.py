@@ -338,12 +338,12 @@ async def play(
             interaction.channel, "Loading playlist...", permanent=True
         )
         server.loading_playlist_message = message
-        tracks = await youtube_requests.playlist_link(interaction, content)
+        tracks = await youtube_requests.playlist_link(content, interaction)
     elif YOUTUBE_VIDEO_REGEX.search(content) is not None:
         message = await my_functions.send_by_channel(
             interaction.channel, "Loading track...", permanent=True
         )
-        tracks = await youtube_requests.single_link(content)
+        tracks = await youtube_requests.single_link(content, interaction.user)
         await my_functions.delete_msg(message)
     else:
         if server.search_results is not None:
@@ -355,7 +355,9 @@ async def play(
             permanent=True,
         )
 
-        searches: list[Track] = youtube_requests.specific_search(content)
+        searches: list[Track] = youtube_requests.specific_search(
+            content, interaction.user
+        )
 
         if await client_is_disconnected(interaction):
             await my_functions.delete_msg(message)
@@ -387,12 +389,6 @@ async def play(
         return
 
     if len(track) == 0 and YOUTUBE_VIDEO_WITH_LIST_REGEX.search(content) is not None:
-        match: re.Match[str] | None = re.match(
-            "^(https://)?(www\.youtube\.com/watch\?v=[^&\n]+)((&list=[^&\n]+)(&index=[^&\n]+)?|(&index=[^&\n]+)(&list=["
-            "^&\n]+)?)",
-            content,
-        )
-
         match: re.Match[str] | None = YOUTUBE_VIDEO_WITH_LIST_REGEX.match(content)
 
         await my_functions.send_by_channel(
@@ -400,7 +396,9 @@ async def play(
         )
         if match:
             video_id: str = match[4] if match[4] is not None else match[7]
-            tracks = await youtube_requests.single_link(f"https://youtu.be/{video_id}")
+            tracks = await youtube_requests.single_link(
+                f"https://youtu.be/{video_id}", interaction.user
+            )
 
     if len(tracks) == 0:
         await my_functions.send_by_channel(

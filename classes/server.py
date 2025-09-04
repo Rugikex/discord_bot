@@ -21,7 +21,7 @@ class Server:
         self._track_queue: TrackQueue = TrackQueue()
         self._loading_playlist_message: discord.Message | None = None
         self._is_disconnected: bool = False
-        self._is_looping: bool = False
+        self._loop_requester: str | None = None
 
     @property
     def server_id(self) -> int:
@@ -40,7 +40,7 @@ class Server:
         message: discord.Message | None
         embed: discord.Embed
         file: discord.File
-        embed, file = my_functions.create_embed(track, self._is_looping)
+        embed, file = my_functions.create_embed(track, self._loop_requester)
         if self._current_track is None:
             message = await my_functions.send_by_channel(
                 interaction.channel,
@@ -49,9 +49,6 @@ class Server:
                 embed=embed,
                 file=file,
             )
-            # message = await my_functions.send_by_channel(
-            #     interaction.channel, f"Now playing {track}.", permanent=True
-            # )
             self._current_track = CurrentTrack(track, message, audio)
             return
 
@@ -117,10 +114,14 @@ class Server:
 
     @property
     def is_looping(self) -> bool:
-        return self._is_looping
+        return self._loop_requester is not None
 
-    def switch_looping(self) -> None:
-        self._is_looping = not self._is_looping
+    def switch_looping(self, requester: str) -> None:
+        self._loop_requester = requester if self._loop_requester is None else None
+
+    @property
+    def loop_requester(self) -> str | None:
+        return self._loop_requester
 
     async def clear_current_and_queue_messages(self) -> None:
         if self._current_track is not None:

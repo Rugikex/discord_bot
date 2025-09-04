@@ -73,6 +73,9 @@ async def on_voice_state_update(member, before, after) -> None:
     if voice_client is None or before.channel is None:
         return
 
+    if not client_bot.server_exists(member.guild.id):
+        return
+
     if (
         member != client_bot.user
         and client_bot.user in before.channel.members
@@ -163,13 +166,28 @@ async def self(interaction: discord.Interaction) -> None:
         return
 
     server: Server = client_bot.get_server(interaction.guild_id)
-    server.switch_looping()
+    server.switch_looping(interaction.user.mention)
     await client_bot.loop.create_task(
         my_functions.send_by_channel(
             interaction.channel,
-            f"Looping is {'enabled' if server.is_looping() else 'disabled'}.",
+            f"Looping is {'enabled' if server.is_looping else 'disabled'}.",
         )
     )
+
+    if server.current_track is not None:
+        track: Track = server.current_track.track
+        embed, _ = my_functions.create_embed(track, server.loop_requester)
+        if server.current_track.message is not None:
+            await my_functions.edit_message(
+                server.current_track.message, "", embed=embed
+            )
+        else:
+            message = await my_functions.send_by_channel(
+                interaction.channel, "", permanent=True, embed=embed
+            )
+            server.current_track.update(
+                server.current_track.track, message, server.current_track.audio
+            )
 
 
 @tree.command(name="move", description="Move the 'position' track to 'new_position'")

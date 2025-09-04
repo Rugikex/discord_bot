@@ -38,7 +38,10 @@ class MyClient(Client):
 
             return result
 
-    def get_server(self, server_id: int | None) -> Server:
+    def server_exists(self, server_id: int) -> bool:
+        return server_id in self._servers
+
+    def get_server(self, server_id: int) -> Server:
         if server_id is None:
             raise Exception("Server not found")
 

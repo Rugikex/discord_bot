@@ -204,6 +204,7 @@ class TrackQueue:
                 "Welcome",
                 datetime.timedelta(seconds=2),
                 "https://www.youtube.com/watch?v=hSU0Z3_466s",
+                interaction.user,
             )
             self._tracks.insert(0, wololo)
             self._is_new = False

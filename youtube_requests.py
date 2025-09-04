@@ -15,7 +15,9 @@ if TYPE_CHECKING:
     from classes.server import Server
 
 
-def specific_search(query: str) -> list[Track]:
+def specific_search(
+    query: str, requester: discord.User | discord.Member
+) -> list[Track]:
     ydl_opts: dict = {
         "quiet": True,
         "extract_flat": True,
@@ -34,13 +36,16 @@ def specific_search(query: str) -> list[Track]:
                 entry.get("title", ""),
                 datetime.timedelta(seconds=entry.get("duration", 0)),
                 entry.get("url", ""),
+                requester,
             )
         )
 
     return tracks
 
 
-async def single_link(video_url: str) -> list[Track]:
+async def single_link(
+    video_url: str, requester: discord.User | discord.Member
+) -> list[Track]:
     ydl_opts = {"quiet": True, "extract_flat": True}
 
     with YoutubeDL(ydl_opts) as ydl:
@@ -53,12 +58,13 @@ async def single_link(video_url: str) -> list[Track]:
             info.get("title", ""),
             datetime.timedelta(seconds=info.get("duration", 0)),
             info.get("webpage_url", video_url),
+            requester,
         )
     ]
 
 
 async def playlist_link(
-    interaction: discord.Interaction, playlist_url: str
+    playlist_url: str, interaction: discord.Interaction
 ) -> list[Track]:
     # if globals_var.client_bot.server_id_using_youtube is not None:
     #     return [None]
@@ -87,6 +93,7 @@ async def playlist_link(
             entry.get("title", ""),
             datetime.timedelta(seconds=entry.get("duration", 0)),
             entry.get("url", ""),
+            interaction.user,
         )
         tracks.append(track)
 
@@ -98,47 +105,47 @@ async def playlist_link(
 
 
 # Not use
-def create_tracks(video_ids: str) -> list[Track]:
-    res: list[Track] = []
-    request = globals_var.youtube.videos().list(
-        part="snippet,contentDetails,id", id=video_ids
-    )
-    response = request.execute()
+# def create_tracks(video_ids: str) -> list[Track]:
+#     res: list[Track] = []
+#     request = globals_var.youtube.videos().list(
+#         part="snippet,contentDetails,id", id=video_ids
+#     )
+#     response = request.execute()
 
-    for item in response["items"]:
-        res.append(
-            Track(
-                item["snippet"]["title"],
-                isodate.parse_duration(item["contentDetails"]["duration"]),
-                "https://www.youtube.com/watch?v=" + item["id"],
-            )
-        )
+#     for item in response["items"]:
+#         res.append(
+#             Track(
+#                 item["snippet"]["title"],
+#                 isodate.parse_duration(item["contentDetails"]["duration"]),
+#                 "https://www.youtube.com/watch?v=" + item["id"],
+#             )
+#         )
 
-    return res
+#     return res
 
 
-# Faster than playlist_link but costs twice in YouTube API units
-def playlist_link2(link: str) -> list[Track]:
-    playlist_id: str = link.split("list=", 1)[1].split("&", 1)[0]
-    request_id = globals_var.youtube.playlistItems().list(
-        part="contentDetails", maxResults=50, playlistId=playlist_id
-    )
-    res: list[Track] = []
-    while request_id is not None:
-        try:
-            response_id = request_id.execute()
-        except HttpError:
-            return []
+# # Faster than playlist_link but costs twice in YouTube API units
+# def playlist_link2(link: str) -> list[Track]:
+#     playlist_id: str = link.split("list=", 1)[1].split("&", 1)[0]
+#     request_id = globals_var.youtube.playlistItems().list(
+#         part="contentDetails", maxResults=50, playlistId=playlist_id
+#     )
+#     res: list[Track] = []
+#     while request_id is not None:
+#         try:
+#             response_id = request_id.execute()
+#         except HttpError:
+#             return []
 
-        video_ids = ",".join(
-            map(
-                str, map(lambda n: n["contentDetails"]["videoId"], response_id["items"])
-            )
-        )
-        res.extend(create_tracks(video_ids))
+#         video_ids = ",".join(
+#             map(
+#                 str, map(lambda n: n["contentDetails"]["videoId"], response_id["items"])
+#             )
+#         )
+#         res.extend(create_tracks(video_ids))
 
-        request_id = globals_var.youtube.playlistItems().list_next(
-            previous_request=request_id, previous_response=response_id
-        )
+#         request_id = globals_var.youtube.playlistItems().list_next(
+#             previous_request=request_id, previous_response=response_id
+#         )
 
-    return res
+#     return res

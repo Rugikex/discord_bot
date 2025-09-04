@@ -56,8 +56,6 @@ class YDLLogger:
             )
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
-        else:
-            print("YDLLogger already has handlers")
 
     def debug(self, msg: Any) -> None:
         # For compatibility with yt-dlp, both debug and info are passed into debug

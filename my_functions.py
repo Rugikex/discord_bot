@@ -160,7 +160,9 @@ def user_is_blacklisted(user_id: int) -> bool:
     return user_id in globals_var.client_bot.blacklist
 
 
-def create_embed(track: Track, is_looping: bool) -> tuple[discord.Embed, discord.File]:
+def create_embed(
+    track: Track, loop_requester: str | None
+) -> tuple[discord.Embed, discord.File]:
     """Create a discord embed and a discord file with the youtube logo."""
     youtube_logo_name: str = "youtube-logo.png"
 
@@ -168,10 +170,16 @@ def create_embed(track: Track, is_looping: bool) -> tuple[discord.Embed, discord
         title=track.title, url=track.link, color=discord.Color.red()
     )
 
-    # TODO embed.set_footer(text="Requested by user")
     embed.set_author(name="Playing", icon_url=f"attachment://{youtube_logo_name}")
-    loop_str: str = "✔️" if is_looping else "❌"
-    embed.description = f"Duration: {track.duration}\nLoop: {loop_str}"
+    loop_str: str = (
+        f"✅ made by {loop_requester}" if loop_requester is not None else "❌"
+    )
+    embed.description = (
+        f"Duration: {track.duration}\n"
+        f"Loop: {loop_str}\n"
+        f"Requested by {track.requester.mention}"
+    )
+
     file: discord.File = discord.File(
         f"assets/{youtube_logo_name}", filename=youtube_logo_name
     )
