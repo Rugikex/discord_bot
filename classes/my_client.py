@@ -41,18 +41,18 @@ class MyClient(Client):
     def server_exists(self, server_id: int) -> bool:
         return server_id in self._servers
 
-    def get_server(self, server_id: int) -> Server:
+    def get_server(self, server_id: int | None) -> Server:
         if server_id is None:
-            raise Exception("Server not found")
+            raise ValueError("Server ID must not be None")
 
         server: Server | None = self._servers.get(server_id)
         if server is None:
-            raise Exception("Server not found")
+            raise KeyError("Server not found")
         return server
 
     def add_server(self, server_id: int | None) -> None:
         if server_id is None:
-            raise Exception("Server not found")
+            raise ValueError("Server ID must not be None")
         server: Server = Server(server_id)
         self._servers[server_id] = server
 

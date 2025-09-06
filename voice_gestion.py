@@ -388,7 +388,7 @@ async def play(
     if await client_is_disconnected(interaction):
         return
 
-    if len(track) == 0 and YOUTUBE_VIDEO_WITH_LIST_REGEX.search(content) is not None:
+    if len(tracks) == 0 and YOUTUBE_VIDEO_WITH_LIST_REGEX.search(content) is not None:
         match: re.Match[str] | None = YOUTUBE_VIDEO_WITH_LIST_REGEX.match(content)
 
         await my_functions.send_by_channel(
