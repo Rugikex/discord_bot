@@ -102,6 +102,8 @@ ydl_opts = {
     "logger": YDLLogger(),
     "youtube_include_dash_manifest": False,
     "ignoreerrors": True,
+    'ratelimit': 1_000_000,
+    'concurrent_fragment_downloads': 1,
 }
 
 load_dotenv()

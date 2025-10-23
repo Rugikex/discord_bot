@@ -1,10 +1,9 @@
 from __future__ import annotations
 import datetime
+import re
 from typing import TYPE_CHECKING
 
 import discord
-from googleapiclient.errors import HttpError
-import isodate
 from yt_dlp import YoutubeDL
 
 from classes.track import Track
@@ -62,13 +61,17 @@ async def single_link(
         )
     ]
 
+def normalize_youtube_url(url: str) -> str:
+    match: re.Match[str] | None = re.search(r"[?&]list=([^&]+)", url)
+    if match:
+        playlist_id: str = match.group(1)
+        return f"https://www.youtube.com/playlist?list={playlist_id}"
+    return url
 
 async def playlist_link(
     playlist_url: str, interaction: discord.Interaction
 ) -> list[Track]:
-    # if globals_var.client_bot.server_id_using_youtube is not None:
-    #     return [None]
-    # globals_var.client_bot.server_id_using_youtube = interaction.guild_id
+    normalized_url: str = normalize_youtube_url(playlist_url)
 
     server: Server = globals_var.client_bot.get_server(interaction.guild_id)
     if server is None:
@@ -76,13 +79,13 @@ async def playlist_link(
 
     ydl_opts = {"quiet": True, "extract_flat": True}
 
-    def extract_info(playlist_url: str) -> dict:
+    def extract_info(url: str) -> dict:
         with YoutubeDL(ydl_opts) as ydl:
-            info: dict = ydl.extract_info(playlist_url, download=False)
+            info: dict = ydl.extract_info(url, download=False)
         return info
 
     info: dict = await globals_var.client_bot.loop.run_in_executor(
-        None, extract_info, playlist_url
+        None, extract_info, normalized_url
     )
 
     tracks: list[Track] = []
@@ -97,55 +100,7 @@ async def playlist_link(
         )
         tracks.append(track)
 
-    # globals_var.client_bot.server_id_using_youtube = None
     await my_functions.delete_msg(server.loading_playlist_message)
     server.loading_playlist_message = None
 
     return tracks
-
-
-# Not use
-# def create_tracks(video_ids: str) -> list[Track]:
-#     res: list[Track] = []
-#     request = globals_var.youtube.videos().list(
-#         part="snippet,contentDetails,id", id=video_ids
-#     )
-#     response = request.execute()
-
-#     for item in response["items"]:
-#         res.append(
-#             Track(
-#                 item["snippet"]["title"],
-#                 isodate.parse_duration(item["contentDetails"]["duration"]),
-#                 "https://www.youtube.com/watch?v=" + item["id"],
-#             )
-#         )
-
-#     return res
-
-
-# # Faster than playlist_link but costs twice in YouTube API units
-# def playlist_link2(link: str) -> list[Track]:
-#     playlist_id: str = link.split("list=", 1)[1].split("&", 1)[0]
-#     request_id = globals_var.youtube.playlistItems().list(
-#         part="contentDetails", maxResults=50, playlistId=playlist_id
-#     )
-#     res: list[Track] = []
-#     while request_id is not None:
-#         try:
-#             response_id = request_id.execute()
-#         except HttpError:
-#             return []
-
-#         video_ids = ",".join(
-#             map(
-#                 str, map(lambda n: n["contentDetails"]["videoId"], response_id["items"])
-#             )
-#         )
-#         res.extend(create_tracks(video_ids))
-
-#         request_id = globals_var.youtube.playlistItems().list_next(
-#             previous_request=request_id, previous_response=response_id
-#         )
-
-#     return res

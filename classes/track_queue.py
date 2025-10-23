@@ -167,7 +167,7 @@ class TrackQueue:
         if position is not None:
             i: int
             track: Track
-            for i, track in enumerate(self._tracks):
+            for i, track in enumerate(tracks):
                 self._tracks.insert(position - 1 + i, track)
             if len(tracks) > 1:
                 await my_functions.send_by_channel(
