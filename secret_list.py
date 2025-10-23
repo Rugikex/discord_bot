@@ -1,6 +1,5 @@
-from typing import Dict
+"""This file contains custom variables that should not be shared."""
 
-
-# custom music/playlist for specific server id
-default_tracks: Dict[int, str] = {
+# custom track/playlist for specific server id
+default_tracks: dict[int, str] = {
 }
