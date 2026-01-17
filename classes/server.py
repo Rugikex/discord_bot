@@ -14,8 +14,12 @@ if TYPE_CHECKING:
 
 
 class Server:
-    def __init__(self, server_id: int) -> None:
+    def __init__(
+        self, server_id: int, default_platform: str, default_tracks: str
+    ) -> None:
         self._server_id: int = server_id
+        self._default_platform: str = default_platform
+        self._default_tracks: dict[str, str] = default_tracks
         self._current_track: CurrentTrack | None = None
         self._search_results: SearchResults | None = None
         self._track_queue: TrackQueue = TrackQueue()
@@ -26,6 +30,14 @@ class Server:
     @property
     def server_id(self) -> int:
         return self._server_id
+
+    @property
+    def default_platform(self) -> str:
+        return self._default_platform
+
+    @property
+    def default_tracks(self) -> dict[str, str]:
+        return self._default_tracks
 
     @property
     def current_track(self) -> CurrentTrack | None:
@@ -41,6 +53,7 @@ class Server:
         embed: discord.Embed
         file: discord.File
         embed, file = my_functions.create_embed(track, self._loop_requester)
+
         if self._current_track is None:
             message = await my_functions.send_by_channel(
                 interaction.channel,
@@ -75,7 +88,7 @@ class Server:
             )
         elif self._current_track.message is not None:
             message = await my_functions.edit_message(
-                self._current_track.message, "", embed=embed
+                self._current_track.message, "", embed=embed, file=file
             )
         else:
             message = await my_functions.send_by_channel(

@@ -1,12 +1,5 @@
 import logging
-import os
 from typing import Any
-
-import discord
-from dotenv import load_dotenv
-from googleapiclient.discovery import build
-
-from classes.my_client import MyClient
 
 
 class ColorFormatter(logging.Formatter):
@@ -45,7 +38,7 @@ class ColorFormatter(logging.Formatter):
 class YDLLogger:
     def __init__(self) -> None:
         self.logger: logging.Logger = logging.getLogger("yt-dlp")
-        self.logger.setLevel(logging.WARNING)
+        self.logger.setLevel(logging.ERROR)
 
         # To avoid duplicates if the class is instantiated multiple times
         if self.logger.handlers == []:
@@ -102,31 +95,6 @@ ydl_opts = {
     "logger": YDLLogger(),
     "youtube_include_dash_manifest": False,
     "ignoreerrors": True,
-    'ratelimit': 1_000_000,
-    'concurrent_fragment_downloads': 1,
+    "ratelimit": 1_000_000,
+    "concurrent_fragment_downloads": 1,
 }
-
-load_dotenv()
-
-discord_key: str | None = os.getenv("DISCORD_KEY")
-if discord_key is None:
-    raise KeyError("No DISCORD_KEY find")
-client_bot: MyClient = MyClient(intents=discord.Intents.all())
-tree: discord.app_commands.CommandTree = discord.app_commands.CommandTree(client_bot)
-
-youtube_key: str | None = os.getenv("YOUTUBE_KEY")
-if youtube_key is None:
-    raise KeyError("No YOUTUBE_KEY find")
-youtube: Any = build("youtube", "v3", developerKey=youtube_key)
-
-skip_seconds: float = 10.0
-add_queue_seconds: float = 5.0
-
-reactions_song: list[str] = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
-reactions_queue: list[str] = ["⬆️", "⬇️"]
-
-msg_blacklist: str = "Sorry, you can't use this bot."
-
-
-def initialize() -> None:
-    global client_bot, youtube, tree, my_logger

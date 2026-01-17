@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 import discord
 
 from classes.track import Track
-import globals_var
+import config
+from constants import QUEUE_REACTIONS
 import my_functions
 import voice_gestion
 
@@ -56,7 +57,7 @@ class TrackQueue:
         for item in self._tracks:
             res += item.duration
 
-        server: Server = globals_var.client_bot.get_server(guild_id)
+        server: Server = config.client_bot.get_server(guild_id)
         current_track: CurrentTrack | None = server.current_track
         if current_track is not None:
             res += current_track.track.duration
@@ -204,6 +205,7 @@ class TrackQueue:
                 "Welcome",
                 datetime.timedelta(seconds=2),
                 "https://www.youtube.com/watch?v=hSU0Z3_466s",
+                "youtube",
                 interaction.user,
             )
             self._tracks.insert(0, wololo)
@@ -224,7 +226,7 @@ class TrackQueue:
     ) -> str:
         number_tracks: int = 1
         max_page: int = max(math.ceil(len(self._tracks) / 10), 1)
-        server: Server = globals_var.client_bot.get_server(interaction.guild_id)
+        server: Server = config.client_bot.get_server(interaction.guild_id)
         msg_content: str = f"Queue list (page {page}/{max_page}):\n"
         if page == 1 and server.current_track is not None:
             current_track: CurrentTrack = server.current_track
@@ -247,9 +249,7 @@ class TrackQueue:
 
     def create_view_queue(self, page: int) -> discord.ui.View:
         view: discord.ui.View = discord.ui.View()
-        button: discord.ui.Button = discord.ui.Button(
-            emoji=globals_var.reactions_queue[0]
-        )
+        button: discord.ui.Button = discord.ui.Button(emoji=QUEUE_REACTIONS[0])
 
         async def button_callback_down(interaction: discord.Interaction) -> None:
             await self.get_queue(interaction, page - 1, is_new=False)
@@ -260,7 +260,7 @@ class TrackQueue:
             button.disabled = True
         view.add_item(button)
 
-        button = discord.ui.Button(emoji=globals_var.reactions_queue[1])
+        button = discord.ui.Button(emoji=QUEUE_REACTIONS[1])
 
         async def button_callback_up(interaction: discord.Interaction):
             await self.get_queue(interaction, page + 1, is_new=False)

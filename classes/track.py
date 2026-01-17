@@ -8,11 +8,17 @@ if TYPE_CHECKING:
 
 class Track:
     def __init__(
-        self, title: str, duration: timedelta, link: str, requester: User | Member
+        self,
+        title: str,
+        duration: timedelta,
+        link: str,
+        origin: str,
+        requester: User | Member,
     ) -> None:
         self._title: str = title
         self._duration: timedelta = duration
         self._link: str = link
+        self._origin: str = origin
         self._requester: User | Member = requester
 
     def __str__(self) -> str:
@@ -29,6 +35,10 @@ class Track:
     @property
     def link(self) -> str:
         return self._link
+
+    @property
+    def origin(self) -> str:
+        return self._origin
 
     @property
     def requester(self) -> User | Member:

@@ -2,6 +2,8 @@ black
 discord.py
 ffmpeg-python
 google-api-python-client
+mutagen
 PyNaCl
 python-dotenv
+thefuzz
 yt-dlp

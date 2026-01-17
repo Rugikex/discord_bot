@@ -4,7 +4,7 @@ from typing import Union, TYPE_CHECKING
 
 import discord
 
-import globals_var
+import config
 
 if TYPE_CHECKING:
     from classes.server import Server
@@ -97,12 +97,17 @@ async def edit_message(
     embed: discord.Embed | None = discord.utils.MISSING,
     delete_after: float | None = None,
     view: discord.ui.View = discord.utils.MISSING,
+    file: discord.File | None = None,
 ) -> discord.Message | None:
     if message is None:
         return None
     try:
         return await message.edit(
-            content=content, embed=embed, delete_after=delete_after, view=view
+            content=content,
+            embed=embed,
+            delete_after=delete_after,
+            view=view,
+            attachments=[file] if file else discord.utils.MISSING,
         )
     except discord.errors.HTTPException:
         return await send_by_channel(message.channel, content, view=view, embed=embed)
@@ -136,11 +141,11 @@ async def disconnect_bot(
     if guild_id is None:
         return
 
-    server: Server = globals_var.client_bot.get_server(guild_id)
+    server: Server = config.client_bot.get_server(guild_id)
     if server.is_disconnected:
         return
 
-    globals_var.client_bot.remove_server(guild_id)
+    config.client_bot.remove_server(guild_id)
     server.disconnect()
     await server.track_queue.clear_queue(None)
 
@@ -150,27 +155,36 @@ async def disconnect_bot(
     await voice_client.disconnect()
     await server.clear()
 
-    if globals_var.client_bot.server_id_using_youtube == guild_id:
-        globals_var.client_bot.server_id_using_youtube = None
+    if config.client_bot.is_using_youtube == guild_id:
+        config.client_bot.server_id_using_youtube = None
 
-    globals_var.my_logger.info(f"Bot disconnects to {voice_client.guild.name}.")
+    config.my_logger.info(f"Bot disconnects to {voice_client.guild.name}.")
 
 
 def user_is_blacklisted(user_id: int) -> bool:
-    return user_id in globals_var.client_bot.blacklist
+    return user_id in config.client_bot.blacklist
 
 
 def create_embed(
     track: Track, loop_requester: str | None
 ) -> tuple[discord.Embed, discord.File]:
-    """Create a discord embed and a discord file with the youtube logo."""
-    youtube_logo_name: str = "youtube-logo.png"
+    """Create a discord embed and a discord file with logo."""
+    logo_name: str
+    color: discord.Color
+    url: str | None
+    if track.origin == "youtube":
+        logo_name = "youtube-logo.png"
+        color = discord.Color.red()
+        url = track.link
+    else:
+        logo_name = "server-logo.png"
+        color = discord.Color.from_str("#1F3F68")
+        url = None
 
-    embed: discord.Embed = discord.Embed(
-        title=track.title, url=track.link, color=discord.Color.red()
-    )
+    file: discord.File = discord.File(f"assets/{logo_name}", filename=logo_name)
 
-    embed.set_author(name="Playing", icon_url=f"attachment://{youtube_logo_name}")
+    embed: discord.Embed = discord.Embed(title=track.title, url=url, color=color)
+    embed.set_author(name="Playing", icon_url=f"attachment://{logo_name}")
     loop_str: str = (
         f"✅ made by {loop_requester}" if loop_requester is not None else "❌"
     )
@@ -178,10 +192,6 @@ def create_embed(
         f"Duration: {track.duration}\n"
         f"Loop: {loop_str}\n"
         f"Requested by {track.requester.mention}"
-    )
-
-    file: discord.File = discord.File(
-        f"assets/{youtube_logo_name}", filename=youtube_logo_name
     )
 
     return embed, file

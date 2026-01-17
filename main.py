@@ -3,10 +3,9 @@ from typing import TYPE_CHECKING
 
 import discord
 
-import globals_var
+import config
+from config import client_bot, tree
 import my_functions
-import secret_list
-from globals_var import client_bot, tree, my_logger
 import voice_gestion
 
 if TYPE_CHECKING:
@@ -61,7 +60,9 @@ async def on_ready() -> None:
         guilds.append(guild.name)
     await client_bot.loop.create_task(tree.sync())
 
-    my_logger.info("Logged in as %s to %s.", client_bot.user, guilds)
+    client_bot.init_server_settings([guild.id for guild in client_bot.guilds])
+
+    config.my_logger.info("Logged in as %s to %s.", client_bot.user, guilds)
 
 
 @client_bot.event
@@ -110,6 +111,30 @@ async def on_voice_state_update(member, before, after) -> None:
         return
 
 
+@tree.command(
+    name="add_private_tracks", description="Add internal tracks in the queue."
+)
+async def self(
+    interaction: discord.Interaction, shuffle: bool = False, position: int | None = None
+) -> None:
+    await client_bot.loop.create_task(
+        my_functions.send_by_interaction(interaction, "Request received")
+    )
+    if my_functions.user_is_blacklisted(interaction.user.id):
+        await client_bot.loop.create_task(
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
+        )
+        return
+
+    await client_bot.loop.create_task(
+        voice_gestion.play_private(
+            interaction,
+            shuffle=shuffle,
+            position=position,
+        )
+    )
+
+
 @tree.command(name="clear", description="Clear the queue.")
 async def self(interaction: discord.Interaction) -> None:
     await client_bot.loop.create_task(
@@ -117,7 +142,7 @@ async def self(interaction: discord.Interaction) -> None:
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
     server: Server = client_bot.get_server(interaction.guild_id)
@@ -135,7 +160,7 @@ async def self(interaction: discord.Interaction) -> None:
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
     await client_bot.loop.create_task(voice_gestion.disconnect(interaction))
@@ -148,7 +173,7 @@ async def self(interaction: discord.Interaction) -> None:
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
     await client_bot.loop.create_task(msg_help(interaction))
@@ -161,7 +186,7 @@ async def self(interaction: discord.Interaction) -> None:
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
 
@@ -199,7 +224,7 @@ async def self(
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
     server: Server = client_bot.get_server(interaction.guild_id)
@@ -216,7 +241,7 @@ async def self(interaction: discord.Interaction) -> None:
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
     await client_bot.loop.create_task(display_current_track(interaction))
@@ -229,26 +254,35 @@ async def self(interaction: discord.Interaction) -> None:
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
     await client_bot.loop.create_task(voice_gestion.pause_track(interaction))
 
 
-@tree.command(name="play", description="Play youtube url/playlist or search terms.")
+@tree.command(name="play", description="Play url/playlist or search terms.")
+@discord.app_commands.choices(
+    platform=[
+        discord.app_commands.Choice(name="YouTube", value="youtube"),
+        discord.app_commands.Choice(name="Private server", value="server"),
+    ]
+)
 async def self(
-    interaction: discord.Interaction, track: str, position: int | None = None
+    interaction: discord.Interaction,
+    track: str,
+    platform: discord.app_commands.Choice[str] | None = None,
+    position: int | None = None,
 ) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
     await client_bot.loop.create_task(
-        voice_gestion.play(interaction, track, position=position)
+        voice_gestion.play(interaction, track, platform, position=position)
     )
 
 
@@ -261,10 +295,13 @@ async def self(
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
-    if interaction.guild_id not in secret_list.default_tracks:
+
+    server: Server = client_bot.get_server(interaction.guild_id)
+    default_tracks: dict[str, str] = server.default_tracks
+    if default_tracks.link is None:
         await client_bot.loop.create_task(
             my_functions.send_by_channel(
                 interaction.channel, "No default track for this server"
@@ -275,7 +312,8 @@ async def self(
     await client_bot.loop.create_task(
         voice_gestion.play(
             interaction,
-            secret_list.default_tracks[interaction.guild_id],
+            default_tracks.link,
+            default_tracks.platform,
             shuffle=shuffle,
             position=position,
         )
@@ -286,34 +324,53 @@ async def self(
     name="play_next",
     description="Play this track after the current one. (can shuffle new track added)",
 )
+@discord.app_commands.choices(
+    platform=[
+        discord.app_commands.Choice(name="YouTube", value="youtube"),
+        discord.app_commands.Choice(name="Private server", value="server"),
+    ]
+)
 async def self(
-    interaction: discord.Interaction, track: str, shuffle: bool = False
+    interaction: discord.Interaction,
+    track: str,
+    platform: discord.app_commands.Choice[str] | None = None,
+    shuffle: bool = False,
 ) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
     await client_bot.loop.create_task(
-        voice_gestion.play(interaction, track, position=1, shuffle=shuffle)
+        voice_gestion.play(interaction, track, platform, position=1, shuffle=shuffle)
     )
 
 
 @tree.command(name="play_shuffle", description="Play and shuffle tracks.")
-async def self(interaction: discord.Interaction, track: str) -> None:
+@discord.app_commands.choices(
+    platform=[
+        discord.app_commands.Choice(name="YouTube", value="youtube"),
+        discord.app_commands.Choice(name="Private server", value="server"),
+    ]
+)
+async def self(
+    interaction: discord.Interaction,
+    track: str,
+    platform: discord.app_commands.Choice[str] | None = None,
+) -> None:
     await client_bot.loop.create_task(
         my_functions.send_by_interaction(interaction, "Request received")
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
     await client_bot.loop.create_task(
-        voice_gestion.play(interaction, track, shuffle=True)
+        voice_gestion.play(interaction, track, platform, shuffle=True)
     )
 
 
@@ -324,7 +381,7 @@ async def self(interaction: discord.Interaction, page: int = 1) -> None:
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
     server: Server = client_bot.get_server(interaction.guild_id)
@@ -341,7 +398,7 @@ async def self(interaction: discord.Interaction, begin: int, end: int = None) ->
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
     if begin < 1 or (end is not None and end < 1) or (end is not None and end < begin):
@@ -368,7 +425,7 @@ async def self(interaction: discord.Interaction) -> None:
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
     await client_bot.loop.create_task(voice_gestion.resume_track(interaction))
@@ -381,7 +438,7 @@ async def self(interaction: discord.Interaction) -> None:
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
     server: Server = client_bot.get_server(interaction.guild_id)
@@ -401,7 +458,7 @@ async def self(interaction: discord.Interaction, number: int = 1) -> None:
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
     if number < 1:
@@ -420,7 +477,7 @@ async def self(interaction: discord.Interaction) -> None:
     )
     if my_functions.user_is_blacklisted(interaction.user.id):
         await client_bot.loop.create_task(
-            my_functions.send_by_interaction(interaction, globals_var.msg_blacklist)
+            my_functions.send_by_interaction(interaction, config.MSG_BLACKLIST)
         )
         return
 
@@ -430,8 +487,7 @@ async def self(interaction: discord.Interaction) -> None:
 
 
 def main():
-    globals_var.initialize()
-    client_bot.run(globals_var.discord_key)
+    client_bot.run(config.discord_key)
 
 
 if __name__ == "__main__":
