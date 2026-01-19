@@ -3,6 +3,7 @@ import datetime
 import re
 from typing import TYPE_CHECKING
 
+from discord import Color
 from discord.ui import View
 from yt_dlp import YoutubeDL
 
@@ -39,6 +40,12 @@ YOUTUBE_VIDEO_WITH_LIST_REGEX: re.Pattern[str] = re.compile(
 
 
 class YoutubeSource(MusicSource):
+    color: Color = Color.red()
+    logo: str = "youtube-logo.png"
+
+    def get_url(self, track: Track) -> str | None:
+        return track.link
+
     async def search(
         self,
         query: str,

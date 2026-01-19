@@ -9,6 +9,19 @@ if TYPE_CHECKING:
 
 
 class MusicSource(ABC):
+
+    @property
+    @abstractmethod
+    def color(self) -> discord.Color: ...
+
+    @property
+    @abstractmethod
+    def logo(self) -> str: ...
+
+    @abstractmethod
+    def get_url(self, track: Track) -> str | None:
+        pass
+
     @abstractmethod
     async def search(
         self,

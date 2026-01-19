@@ -4,6 +4,7 @@ from mutagen import File
 import os
 from typing import TYPE_CHECKING
 
+from discord import Color
 from discord.ui import View
 from thefuzz import fuzz
 
@@ -21,6 +22,12 @@ if TYPE_CHECKING:
 
 
 class ServerSource(MusicSource):
+    color: Color = Color.from_str("#1F3F68")
+    logo: str = "server-logo.png"
+
+    def get_url(self, track: Track) -> str | None:
+        return None
+
     async def search(
         self,
         query: str,

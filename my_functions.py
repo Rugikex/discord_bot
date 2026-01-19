@@ -7,6 +7,7 @@ import discord
 import config
 
 if TYPE_CHECKING:
+    from classes.music_source import MusicSource
     from classes.server import Server
     from classes.track import Track
 
@@ -169,17 +170,10 @@ def create_embed(
     track: Track, loop_requester: str | None
 ) -> tuple[discord.Embed, discord.File]:
     """Create a discord embed and a discord file with logo."""
-    logo_name: str
-    color: discord.Color
-    url: str | None
-    if track.origin == "youtube":
-        logo_name = "youtube-logo.png"
-        color = discord.Color.red()
-        url = track.link
-    else:
-        logo_name = "server-logo.png"
-        color = discord.Color.from_str("#1F3F68")
-        url = None
+    music_source: MusicSource = config.MUSIC_SOURCES[track.origin]
+    color: discord.Color = music_source.color
+    logo_name: str = music_source.logo
+    url: str | None = music_source.get_url(track)
 
     file: discord.File = discord.File(f"assets/{logo_name}", filename=logo_name)
 
