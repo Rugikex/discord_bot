@@ -1,13 +1,13 @@
 from pathlib import Path
 from typing import Any
 
-# Project folder: paths don't depend on the directory the bot is launched from
 BASE_DIR: Path = Path(__file__).resolve().parent
 
 SKIP_TIMER: float = 10.0
 ADD_QUEUE_TIMER: float = 5.0
 
 SONG_REACTIONS: list[str] = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
+MAX_SEARCH_RESULTS: int = len(SONG_REACTIONS)
 # Seconds before the buttons of a search expire (its message is then deleted)
 SEARCH_TIMEOUT: float = 180.0
 QUEUE_REACTIONS: list[str] = ["⬆️", "⬇️"]

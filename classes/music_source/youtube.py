@@ -9,17 +9,11 @@ from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 
 from .base import MusicSource
-from classes.search_results import SearchResults
-from classes.search_view import show_search_results
 from classes.track import Track
+from constants import MAX_SEARCH_RESULTS
 from logger_setup import YDLLogger, my_logger
-import my_functions
 
 if TYPE_CHECKING:
-    from classes.my_client import MyClient
-    from classes.guild_player import GuildPlayer
-    from classes.search_view import OnSelect
-
     import discord
 
 
@@ -111,73 +105,36 @@ class YoutubeSource(MusicSource):
         tracks: list[Track] = await self._single_link(link, requester)
         return tracks[0] if tracks else None
 
-    async def search(
-        self,
-        query: str,
-        interaction: discord.Interaction[MyClient],
-        shuffle: bool,
-        position: int | None,
-        on_select: OnSelect,
+    def is_link(self, query: str) -> bool:
+        return (
+            YOUTUBE_PLAYLIST_REGEX.search(query) is not None
+            or YOUTUBE_VIDEO_REGEX.search(query) is not None
+        )
+
+    async def load(
+        self, link: str, requester: discord.User | discord.Member
     ) -> list[Track]:
-        message: discord.Message | None
-        player: GuildPlayer = interaction.client.get_player(interaction.guild_id)
-        tracks: list[Track] = []
+        if YOUTUBE_PLAYLIST_REGEX.search(link) is None:
+            return await self._single_link(link, requester)
 
-        if YOUTUBE_PLAYLIST_REGEX.search(query) is not None:
-            message = await my_functions.send_by_channel(
-                interaction.channel, "Loading playlist...", permanent=True
-            )
-            player.loading_playlist_message = message
-            tracks = await self._playlist_link(query, interaction)
-        elif YOUTUBE_VIDEO_REGEX.search(query) is not None:
-            message = await my_functions.send_by_channel(
-                interaction.channel, "Loading track...", permanent=True
-            )
-            tracks = await self._single_link(query, interaction.user)
-            await my_functions.delete_msg(message)
-        else:
-            if player.search_results is not None:
-                await my_functions.delete_msg(player.search_results.message)
+        tracks: list[Track] = await self._playlist_link(link, requester)
+        if tracks:
+            return tracks
 
-            message = await my_functions.send_by_channel(
-                interaction.channel,
-                f"Searching for track related to {query}.",
-                permanent=True,
-            )
-
-            searches: list[Track] = await self._specific_search(query, interaction.user)
-
-            if not searches:
-                await my_functions.edit_message(
-                    message, content=f'No track found for "{query}".', delete_after=10.0
-                )
-                return []
-
-            search_results: SearchResults = SearchResults(
-                searches, query, shuffle, interaction.user, message, position
-            )
-            player.search_results = search_results
-
-            await show_search_results(search_results, on_select)
+        # Unreadable playlist (e.g. a mix): load only the video of the link
+        match: re.Match[str] | None = YOUTUBE_VIDEO_WITH_LIST_REGEX.match(link)
+        if match is None:
             return []
+        video_id: str = match[4] if match[4] is not None else match[7]
+        return await self._single_link(f"https://youtu.be/{video_id}", requester)
 
-        if len(tracks) == 0 and YOUTUBE_VIDEO_WITH_LIST_REGEX.search(query) is not None:
-            match: re.Match[str] | None = YOUTUBE_VIDEO_WITH_LIST_REGEX.match(query)
-
-            await my_functions.reply(interaction, "No playlist found, loading track...")
-            if match:
-                video_id: str = match[4] if match[4] is not None else match[7]
-                tracks = await self._single_link(
-                    f"https://youtu.be/{video_id}", interaction.user
-                )
-
-        if len(tracks) == 0:
-            await my_functions.reply(
-                interaction, f'No audio found for "{query}".', private=True
-            )
-            return []
-
-        return tracks
+    async def search(
+        self, query: str, requester: discord.User | discord.Member
+    ) -> list[Track]:
+        info: dict[str, Any] | None = await asyncio.to_thread(
+            _extract_flat, f"ytsearch{MAX_SEARCH_RESULTS}:{query}"
+        )
+        return _entries_to_tracks(info, requester)
 
     async def get_stream_url(self, track: Track) -> tuple[str | None, dict[str, str]]:
         info: dict[str, Any] | None = await asyncio.to_thread(
@@ -195,14 +152,6 @@ class YoutubeSource(MusicSource):
                         url = info_format.get("url")
                         break
         return url, FFMPEG_OPTIONS
-
-    async def _specific_search(
-        self, query: str, requester: discord.User | discord.Member
-    ) -> list[Track]:
-        info: dict[str, Any] | None = await asyncio.to_thread(
-            _extract_flat, f"ytsearch5:{query}"
-        )
-        return _entries_to_tracks(info, requester)
 
     async def _single_link(
         self, video_url: str, requester: discord.User | discord.Member
@@ -229,18 +178,10 @@ class YoutubeSource(MusicSource):
         return url
 
     async def _playlist_link(
-        self, playlist_url: str, interaction: discord.Interaction[MyClient]
+        self, playlist_url: str, requester: discord.User | discord.Member
     ) -> list[Track]:
         normalized_url: str = self._normalize_youtube_url(playlist_url)
-
-        player: GuildPlayer = interaction.client.get_player(interaction.guild_id)
-
         info: dict[str, Any] | None = await asyncio.to_thread(
             _extract_flat, normalized_url
         )
-        tracks: list[Track] = _entries_to_tracks(info, interaction.user)
-
-        await my_functions.delete_msg(player.loading_playlist_message)
-        player.loading_playlist_message = None
-
-        return tracks
+        return _entries_to_tracks(info, requester)

@@ -8,15 +8,14 @@ import discord
 from constants import BASE_DIR
 
 if TYPE_CHECKING:
-    from classes.my_client import MyClient
     from classes.track import Track
-    from classes.search_view import OnSelect
 
 
 ASSETS_FOLDER: Path = BASE_DIR / "assets"
 
 
 class MusicSource(ABC):
+    """Find and stream tracks of a platform."""
 
     @property
     @abstractmethod
@@ -37,15 +36,21 @@ class MusicSource(ABC):
         """Build a track (with its real title and duration) from a link."""
         pass
 
+    def is_link(self, query: str) -> bool:
+        """True to load the query with load(), False to search it with search()."""
+        return False
+
+    async def load(
+        self, link: str, requester: discord.User | discord.Member
+    ) -> list[Track]:
+        """Tracks of a link (several for a playlist), empty if nothing is found."""
+        return []
+
     @abstractmethod
     async def search(
-        self,
-        query: str,
-        interaction: discord.Interaction[MyClient],
-        shuffle: bool,
-        position: int | None,
-        on_select: OnSelect,
+        self, query: str, requester: discord.User | discord.Member
     ) -> list[Track]:
+        """At most MAX_SEARCH_RESULTS tracks matching the query, best first."""
         pass
 
     @abstractmethod

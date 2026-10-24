@@ -11,6 +11,7 @@ from classes.music_source import MUSIC_SOURCES
 from classes.music_source.local import list_local_files, load_local_tracks
 from classes.track import Track
 from classes.search_results import SearchResults
+from classes.search_view import show_search_results
 from logger_setup import my_logger
 import my_functions
 
@@ -309,101 +310,33 @@ async def select_specific_search(
     return True
 
 
-async def play(
+async def join_user_channel(
     interaction: discord.Interaction[MyClient],
+) -> GuildPlayer | None:
+    """Connect the bot to the voice channel of the user, None if it can't."""
+    if not await user_is_connected(interaction):
+        return None
+
+    if not await is_connected(interaction, interaction.user.voice.channel):
+        return None
+
+    voice_client: discord.VoiceClient | None = await get_voice_client(interaction)
+    if voice_client is None:
+        await my_functions.reply(interaction, "I have been disconnected.", private=True)
+        return None
+
+    return interaction.client.get_player(interaction.guild_id)
+
+
+async def add_tracks(
+    interaction: discord.Interaction[MyClient],
+    player: GuildPlayer,
+    tracks: list[Track],
     content: str,
-    raw_platform: discord.app_commands.Choice[str] | str | None = None,
-    shuffle: bool = False,
-    position: int | None = None,
+    shuffle: bool,
+    position: int | None,
 ) -> None:
-    if not await user_is_connected(interaction):
-        return
-
-    if not await is_connected(interaction, interaction.user.voice.channel):
-        return
-
-    voice_client: discord.VoiceClient | None = await get_voice_client(interaction)
-    if voice_client is None:
-        await my_functions.reply(interaction, "I have been disconnected.", private=True)
-        return
-
-    player: GuildPlayer = interaction.client.get_player(interaction.guild_id)
-    track_queue: TrackQueue = player.track_queue
-
-    platform: str
-    if raw_platform is None:
-        platform = player.default_platform
-    elif isinstance(raw_platform, str):
-        platform = raw_platform
-    else:
-        platform = raw_platform.value
-
-    if platform not in MUSIC_SOURCES:
-        await my_functions.reply(
-            interaction, f'Unknown platform "{platform}".', private=True
-        )
-        return
-
-    if position and (position < 1 or position > track_queue.queue_size):
-        position = None
-
-    tracks: list[Track] = await MUSIC_SOURCES[platform].search(
-        content, interaction, shuffle, position, select_specific_search
-    )
-
-    if await client_is_disconnected(interaction) or len(tracks) == 0:
-        return
-
-    if shuffle and position:
-        random.seed()
-        random.shuffle(tracks)
-
-    shuffle_queue: bool = shuffle and not position
-
-    await track_queue.add_in_queue(
-        interaction, tracks, position, content, shuffle_queue
-    )
-
-    await next_track(interaction, interaction.guild_id)
-
-
-async def play_local(
-    interaction: discord.Interaction[MyClient],
-    shuffle: bool = False,
-    position: int | None = None,
-) -> None:
-    if not await user_is_connected(interaction):
-        return
-
-    if not await is_connected(interaction, interaction.user.voice.channel):
-        return
-
-    voice_client: discord.VoiceClient | None = await get_voice_client(interaction)
-    if voice_client is None:
-        await my_functions.reply(interaction, "I have been disconnected.", private=True)
-        return
-
-    player: GuildPlayer = interaction.client.get_player(interaction.guild_id)
-    track_queue: TrackQueue = player.track_queue
-
-    if position and (position < 1 or position > track_queue.queue_size):
-        position = None
-
-    message: discord.Message | None = await my_functions.send_by_channel(
-        interaction.channel, "Loading local files...", permanent=True
-    )
-    tracks: list[Track] = await asyncio.to_thread(
-        load_local_tracks, list_local_files(), interaction.user
-    )
-
-    if not tracks:
-        await my_functions.edit_message(
-            message, content="No local files found.", delete_after=10.0
-        )
-        return
-
-    await my_functions.delete_msg(message)
-
+    """Add tracks to the queue (shuffled if asked) and start playing."""
     if await client_is_disconnected(interaction):
         return
 
@@ -413,8 +346,101 @@ async def play_local(
 
     shuffle_queue: bool = shuffle and not position
 
-    await track_queue.add_in_queue(
-        interaction, tracks, position, "Local files", shuffle_queue
+    await player.track_queue.add_in_queue(
+        interaction, tracks, position, content, shuffle_queue
     )
 
     await next_track(interaction, interaction.guild_id)
+
+
+async def show_search(
+    interaction: discord.Interaction[MyClient],
+    player: GuildPlayer,
+    music_source: MusicSource,
+    query: str,
+    shuffle: bool,
+    position: int | None,
+) -> None:
+    """Search the query and send the results, added once one is selected."""
+    tracks: list[Track] = await music_source.search(query, interaction.user)
+    if not tracks:
+        await my_functions.reply(
+            interaction, f'No track found for "{query}".', private=True
+        )
+        return
+
+    # Only one search at a time: the buttons of the previous one are removed
+    if player.search_results is not None:
+        await player.search_results.delete_message()
+
+    player.search_results = SearchResults(
+        tracks, query, shuffle, interaction.user, None, position
+    )
+    await show_search_results(
+        interaction, player.search_results, select_specific_search
+    )
+
+
+async def play(
+    interaction: discord.Interaction[MyClient],
+    content: str,
+    raw_platform: discord.app_commands.Choice[str] | str | None = None,
+    shuffle: bool = False,
+    position: int | None = None,
+) -> None:
+    player: GuildPlayer | None = await join_user_channel(interaction)
+    if player is None:
+        return
+
+    platform: str
+    if raw_platform is None:
+        platform = player.default_platform
+    elif isinstance(raw_platform, str):
+        platform = raw_platform
+    else:
+        platform = raw_platform.value
+
+    music_source: MusicSource | None = MUSIC_SOURCES.get(platform)
+    if music_source is None:
+        await my_functions.reply(
+            interaction, f'Unknown platform "{platform}".', private=True
+        )
+        return
+
+    if position and (position < 1 or position > player.track_queue.queue_size):
+        position = None
+
+    if not music_source.is_link(content):
+        await show_search(interaction, player, music_source, content, shuffle, position)
+        return
+
+    tracks: list[Track] = await music_source.load(content, interaction.user)
+    if not tracks:
+        await my_functions.reply(
+            interaction, f'No audio found for "{content}".', private=True
+        )
+        return
+
+    await add_tracks(interaction, player, tracks, content, shuffle, position)
+
+
+async def play_local(
+    interaction: discord.Interaction[MyClient],
+    shuffle: bool = False,
+    position: int | None = None,
+) -> None:
+    player: GuildPlayer | None = await join_user_channel(interaction)
+    if player is None:
+        return
+
+    if position and (position < 1 or position > player.track_queue.queue_size):
+        position = None
+
+    tracks: list[Track] = await asyncio.to_thread(
+        load_local_tracks, list_local_files(), interaction.user
+    )
+    if not tracks:
+        await my_functions.reply(interaction, "No local files found.", private=True)
+        return
+
+    await add_tracks(interaction, player, tracks, "Local files", shuffle, position)

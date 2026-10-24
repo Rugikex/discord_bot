@@ -35,7 +35,6 @@ class GuildPlayer:
         self._current_track: CurrentTrack | None = None
         self._search_results: SearchResults | None = None
         self._track_queue: TrackQueue = TrackQueue()
-        self._loading_playlist_message: discord.Message | None = None
         self._is_disconnected: bool = False
         self._loop_requester: str | None = None
 
@@ -130,16 +129,6 @@ class GuildPlayer:
         return self._track_queue
 
     @property
-    def loading_playlist_message(self) -> discord.Message | None:
-        return self._loading_playlist_message
-
-    @loading_playlist_message.setter
-    def loading_playlist_message(
-        self, loading_playlist_message: discord.Message | None
-    ) -> None:
-        self._loading_playlist_message = loading_playlist_message
-
-    @property
     def is_disconnected(self) -> bool:
         return self._is_disconnected
 
@@ -168,7 +157,6 @@ class GuildPlayer:
 
     async def clear(self) -> None:
         await self.clear_current_and_queue_messages()
-        await my_functions.delete_msg(self._loading_playlist_message)
         if self._search_results is not None:
             await self._search_results.delete_message()
         # TODO: Delete other message

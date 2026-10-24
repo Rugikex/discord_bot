@@ -53,14 +53,16 @@ class SearchView(discord.ui.View):
 
 
 async def show_search_results(
-    search_results: SearchResults, on_select: OnSelect
+    interaction: discord.Interaction, search_results: SearchResults, on_select: OnSelect
 ) -> None:
-    """Edit the search message to list the tracks with a button for each."""
+    """Send the tracks of a search with a button for each."""
     content: str = "Select a track with buttons.\n\n" + "".join(
         f"**{i + 1}:** {track}\n" for i, track in enumerate(search_results.tracks)
     )
-    search_results.message = await my_functions.edit_message(
-        search_results.message,
-        content=content,
+    # Permanent: deleted on selection or when the buttons expire
+    search_results.message = await my_functions.send_by_channel(
+        interaction.channel,
+        content,
+        permanent=True,
         view=SearchView(search_results, on_select),
     )
