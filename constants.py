@@ -1,4 +1,8 @@
+from pathlib import Path
 from typing import Any
+
+# Project folder: paths don't depend on the directory the bot is launched from
+BASE_DIR: Path = Path(__file__).resolve().parent
 
 SKIP_TIMER: float = 10.0
 ADD_QUEUE_TIMER: float = 5.0

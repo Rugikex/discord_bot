@@ -1,13 +1,19 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import discord
+
+from constants import BASE_DIR
 
 if TYPE_CHECKING:
     from classes.my_client import MyClient
     from classes.track import Track
     from collections.abc import Awaitable, Callable
+
+
+ASSETS_FOLDER: Path = BASE_DIR / "assets"
 
 
 class MusicSource(ABC):
@@ -50,7 +56,7 @@ class MusicSource(ABC):
         self, track: Track, loop_requester: str | None
     ) -> tuple[discord.Embed, discord.File]:
         """Create a discord embed and a discord file with logo."""
-        file: discord.File = discord.File(f"assets/{self.logo}", filename=self.logo)
+        file: discord.File = discord.File(ASSETS_FOLDER / self.logo, filename=self.logo)
 
         embed: discord.Embed = discord.Embed(
             title=track.title, url=self.get_url(track), color=self.color

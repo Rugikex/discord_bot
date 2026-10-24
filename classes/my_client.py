@@ -1,22 +1,22 @@
 from __future__ import annotations
 import asyncio
 import copy
-from io import TextIOWrapper
 import json
-import os
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from discord import Client, utils
 
 from classes.my_command_tree import MyCommandTree
 from classes.server import Server
-from constants import DEFAULT_SETTINGS
+from constants import BASE_DIR, DEFAULT_SETTINGS
 from logger_setup import my_logger
 
 if TYPE_CHECKING:
     from discord import AllowedMentions, Intents, Member, VoiceClient, VoiceState
 
-SETTINGS_FOLDER: str = "server_settings"
+SETTINGS_FOLDER: Path = BASE_DIR / "server_settings"
+BLACKLIST_FILE: Path = BASE_DIR / "blacklist.txt"
 
 
 class MyClient(Client):
@@ -107,23 +107,21 @@ class MyClient(Client):
         my_logger.info("Bot disconnects to %s.", voice_client.guild.name)
 
     def _get_blacklist(self) -> set[int]:
-        if not os.path.exists("blacklist.txt"):
+        if not BLACKLIST_FILE.exists():
             return set()
 
-        file: TextIOWrapper
-        with open("blacklist.txt", "r", encoding="utf-8") as file:
-            result: set[int] = set()
-            line: str
-            for line in file.readlines():
-                line = line.strip()
-                if line == "":
-                    continue
-                try:
-                    result.add(int(line))
-                except ValueError:
-                    pass
+        result: set[int] = set()
+        line: str
+        for line in BLACKLIST_FILE.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line == "":
+                continue
+            try:
+                result.add(int(line))
+            except ValueError:
+                pass
 
-            return result
+        return result
 
     def init_server_settings(self, server_ids: list[int]) -> None:
         """Create or complete the settings file of each server.
@@ -152,15 +150,18 @@ class MyClient(Client):
             raise KeyError("Server not found")
         return server
 
+    @staticmethod
+    def _settings_path(server_id: int) -> Path:
+        return SETTINGS_FOLDER / f"{server_id}.json"
+
     def _read_settings_file(self, server_id: int) -> dict[str, Any]:
-        file_path: str = f"{SETTINGS_FOLDER}/{server_id}.json"
-        if not os.path.exists(file_path):
+        file_path: Path = self._settings_path(server_id)
+        if not file_path.exists():
             return {}
-        with open(file_path, "r", encoding="utf-8") as file:
-            try:
-                settings: Any = json.load(file)
-            except json.JSONDecodeError:
-                return {}
+        try:
+            settings: Any = json.loads(file_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {}
         return settings if isinstance(settings, dict) else {}
 
     def load_settings(self, server_id: int) -> dict[str, Any]:
@@ -172,9 +173,10 @@ class MyClient(Client):
         }
 
     def save_settings(self, server_id: int, settings: dict[str, Any]) -> None:
-        os.makedirs(SETTINGS_FOLDER, exist_ok=True)
-        with open(f"{SETTINGS_FOLDER}/{server_id}.json", "w", encoding="utf-8") as file:
-            json.dump(settings, file, indent=4, ensure_ascii=False)
+        SETTINGS_FOLDER.mkdir(exist_ok=True)
+        self._settings_path(server_id).write_text(
+            json.dumps(settings, indent=4, ensure_ascii=False), encoding="utf-8"
+        )
 
     def update_setting(self, server_id: int, key: str, value: Any) -> None:
         settings: dict[str, Any] = self.load_settings(server_id)

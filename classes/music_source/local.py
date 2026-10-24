@@ -2,7 +2,7 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 from mutagen import File, MutagenError
-import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from discord import Color
@@ -12,6 +12,7 @@ from thefuzz import fuzz
 from .base import MusicSource
 from classes.track import Track
 from classes.search_results import SearchResults
+from constants import BASE_DIR
 import my_functions
 
 if TYPE_CHECKING:
@@ -21,20 +22,26 @@ if TYPE_CHECKING:
     import discord
 
 
-MUSIC_FOLDER: str = "music"
+MUSIC_FOLDER: Path = BASE_DIR / "music"
 AUDIO_EXTENSIONS: tuple[str, ...] = (".mp3", ".wav", ".flac")
 
 
-def list_local_files() -> list[str]:
-    if not os.path.isdir(MUSIC_FOLDER):
+def list_local_files() -> list[Path]:
+    if not MUSIC_FOLDER.is_dir():
         return []
-    return [f for f in os.listdir(MUSIC_FOLDER) if f.lower().endswith(AUDIO_EXTENSIONS)]
+    return [
+        path
+        for path in MUSIC_FOLDER.iterdir()
+        if path.suffix.lower() in AUDIO_EXTENSIONS
+    ]
 
 
 def load_local_track(
-    path: str, requester: discord.User | discord.Member
+    path: str | Path, requester: discord.User | discord.Member
 ) -> Track | None:
     """Blocking (reads the file): run it in an executor."""
+    # A relative path (e.g. "music/intro.mp3" in the settings) starts from BASE_DIR
+    path = BASE_DIR / path
     try:
         audio = File(path)
     except (MutagenError, OSError):
@@ -43,21 +50,21 @@ def load_local_track(
         return None
 
     return Track(
-        os.path.splitext(os.path.basename(path))[0],
+        path.stem,
         timedelta(seconds=int(audio.info.length)),
-        path,
+        str(path),
         "local",
         requester,
     )
 
 
 def load_local_tracks(
-    file_names: list[str], requester: discord.User | discord.Member
+    paths: list[Path], requester: discord.User | discord.Member
 ) -> list[Track]:
     """Blocking (reads files): run it in an executor."""
     tracks: list[Track] = []
-    for file_name in file_names:
-        track: Track | None = load_local_track(f"{MUSIC_FOLDER}/{file_name}", requester)
+    for path in paths:
+        track: Track | None = load_local_track(path, requester)
         if track is not None:
             tracks.append(track)
     return tracks
@@ -83,7 +90,7 @@ class LocalSource(MusicSource):
         position: int | None,
         create_button_select: Callable[[int, str], Awaitable[discord.ui.Button]],
     ) -> list[Track]:
-        files: list[str] = list_local_files()
+        files: list[Path] = list_local_files()
         server: Server = interaction.client.get_server(interaction.guild_id)
 
         if server.search_results is not None:
@@ -97,7 +104,7 @@ class LocalSource(MusicSource):
 
         matches = []
         for file in files:
-            score = fuzz.WRatio(query, os.path.splitext(file)[0])
+            score = fuzz.WRatio(query, file.stem)
             if score >= 50:
                 matches.append({"file": file, "score": score})
 
