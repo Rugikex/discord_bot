@@ -73,9 +73,7 @@ class LocalSource(MusicSource):
     async def get_track(
         self, link: str, requester: discord.User | discord.Member
     ) -> Track | None:
-        return await asyncio.get_running_loop().run_in_executor(
-            None, load_local_track, link, requester
-        )
+        return await asyncio.to_thread(load_local_track, link, requester)
 
     async def search(
         self,
@@ -113,8 +111,8 @@ class LocalSource(MusicSource):
         matches = [match["file"] for match in matches]
         matches = matches[:5]
 
-        searches: list[Track] = await asyncio.get_running_loop().run_in_executor(
-            None, load_local_tracks, matches, interaction.user
+        searches: list[Track] = await asyncio.to_thread(
+            load_local_tracks, matches, interaction.user
         )
         if not searches:
             await my_functions.edit_message(

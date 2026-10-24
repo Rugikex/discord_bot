@@ -409,8 +409,8 @@ async def play_local(
     message: discord.Message | None = await my_functions.send_by_channel(
         interaction.channel, "Loading local files...", permanent=True
     )
-    tracks: list[Track] = await asyncio.get_running_loop().run_in_executor(
-        None, load_local_tracks, list_local_files(), interaction.user
+    tracks: list[Track] = await asyncio.to_thread(
+        load_local_tracks, list_local_files(), interaction.user
     )
 
     if not tracks:

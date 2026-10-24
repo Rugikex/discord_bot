@@ -190,8 +190,8 @@ class YoutubeSource(MusicSource):
         return tracks
 
     async def get_stream_url(self, track: Track) -> tuple[str | None, dict[str, str]]:
-        info: dict[str, Any] | None = await asyncio.get_running_loop().run_in_executor(
-            None, _extract_stream, track.link
+        info: dict[str, Any] | None = await asyncio.to_thread(
+            _extract_stream, track.link
         )
 
         url: str | None = None
@@ -209,17 +209,15 @@ class YoutubeSource(MusicSource):
     async def _specific_search(
         self, query: str, requester: discord.User | discord.Member
     ) -> list[Track]:
-        info: dict[str, Any] | None = await asyncio.get_running_loop().run_in_executor(
-            None, _extract_flat, f"ytsearch5:{query}"
+        info: dict[str, Any] | None = await asyncio.to_thread(
+            _extract_flat, f"ytsearch5:{query}"
         )
         return _entries_to_tracks(info, requester)
 
     async def _single_link(
         self, video_url: str, requester: discord.User | discord.Member
     ) -> list[Track]:
-        info: dict[str, Any] | None = await asyncio.get_running_loop().run_in_executor(
-            None, _extract_flat, video_url
-        )
+        info: dict[str, Any] | None = await asyncio.to_thread(_extract_flat, video_url)
 
         if not info or info.get("duration") is None:
             return []
@@ -247,8 +245,8 @@ class YoutubeSource(MusicSource):
 
         server: Server = interaction.client.get_server(interaction.guild_id)
 
-        info: dict[str, Any] | None = await asyncio.get_running_loop().run_in_executor(
-            None, _extract_flat, normalized_url
+        info: dict[str, Any] | None = await asyncio.to_thread(
+            _extract_flat, normalized_url
         )
         tracks: list[Track] = _entries_to_tracks(info, interaction.user)
 
