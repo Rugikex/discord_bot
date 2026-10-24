@@ -5,12 +5,12 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from discord import Color
-from discord.ui import View
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 
 from .base import MusicSource
 from classes.search_results import SearchResults
+from classes.search_view import show_search_results
 from classes.track import Track
 from logger_setup import YDLLogger, my_logger
 import my_functions
@@ -18,7 +18,7 @@ import my_functions
 if TYPE_CHECKING:
     from classes.my_client import MyClient
     from classes.guild_player import GuildPlayer
-    from collections.abc import Awaitable, Callable
+    from classes.search_view import OnSelect
 
     import discord
 
@@ -117,7 +117,7 @@ class YoutubeSource(MusicSource):
         interaction: discord.Interaction[MyClient],
         shuffle: bool,
         position: int | None,
-        create_button_select: Callable[[int, str], Awaitable[discord.ui.Button]],
+        on_select: OnSelect,
     ) -> list[Track]:
         message: discord.Message | None
         player: GuildPlayer = interaction.client.get_player(interaction.guild_id)
@@ -154,19 +154,11 @@ class YoutubeSource(MusicSource):
                 return []
 
             search_results: SearchResults = SearchResults(
-                searches, shuffle, interaction.user, message, position
+                searches, query, shuffle, interaction.user, message, position
             )
             player.search_results = search_results
 
-            msg_content: str = "Select a track with buttons.\n\n"
-            for i, track in enumerate(searches):
-                msg_content += f"**{i + 1}:** {track}\n"
-
-            view: View = View()
-            for i in range(len(searches)):
-                view.add_item(await create_button_select(i, query))
-
-            await my_functions.edit_message(message, content=msg_content, view=view)
+            await show_search_results(search_results, on_select)
             return []
 
         if len(tracks) == 0 and YOUTUBE_VIDEO_WITH_LIST_REGEX.search(query) is not None:

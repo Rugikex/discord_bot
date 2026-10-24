@@ -11,7 +11,6 @@ from classes.music_source import MUSIC_SOURCES
 from classes.music_source.local import list_local_files, load_local_tracks
 from classes.track import Track
 from classes.search_results import SearchResults
-from constants import SONG_REACTIONS
 from logger_setup import my_logger
 import my_functions
 
@@ -276,19 +275,20 @@ async def is_connected(
 
 
 async def select_specific_search(
-    interaction: discord.Interaction[MyClient], number: int, content: str
-) -> None:
+    interaction: discord.Interaction[MyClient],
+    search_results: SearchResults,
+    number: int,
+) -> bool:
+    """Add the chosen track of a search, return False if it can't be selected."""
     player: GuildPlayer | None = interaction.client.find_player(interaction.guild_id)
-    if player is None:
-        return
+    # Bot disconnected, search replaced by a new one or already selected
+    if player is None or player.search_results is not search_results:
+        return False
 
-    search_results: SearchResults | None = player.search_results
-    if search_results is None:
-        return
-
+    # The user can join the voice channel and click again
     voice_client: discord.VoiceClient | None = await get_voice_client(interaction)
     if voice_client is None:
-        return
+        return False
 
     # Only one selection per search
     player.search_results = None
@@ -304,22 +304,11 @@ async def select_specific_search(
     shuffle_queue: bool = shuffle and not position
 
     await track_queue.add_in_queue(
-        interaction, [track], position, content, shuffle_queue
+        interaction, [track], position, search_results.query, shuffle_queue
     )
 
     await next_track(interaction, interaction.guild_id)
-
-
-async def create_button_select(number: int, content: str) -> discord.ui.Button:
-    button: discord.ui.Button = discord.ui.Button(emoji=SONG_REACTIONS[number])
-
-    async def button_callback(interaction: discord.Interaction):
-        # Acknowledge the click, otherwise Discord shows "This interaction failed"
-        await interaction.response.defer()
-        await select_specific_search(interaction, number, content)
-
-    button.callback = button_callback
-    return button
+    return True
 
 
 async def play(
@@ -363,7 +352,7 @@ async def play(
         position = None
 
     tracks: list[Track] = await MUSIC_SOURCES[platform].search(
-        content, interaction, shuffle, position, create_button_select
+        content, interaction, shuffle, position, select_specific_search
     )
 
     if await client_is_disconnected(interaction) or len(tracks) == 0:

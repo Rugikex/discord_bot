@@ -13,12 +13,14 @@ class SearchResults:
     def __init__(
         self,
         tracks: list[Track],
+        query: str,
         shuffle: bool,
         user: discord.Member,
         message: discord.Message | None,
         position: int | None,
     ) -> None:
         self._tracks: list[Track] = tracks
+        self._query: str = query
         self._shuffle: bool = shuffle
         self._user: discord.Member = user
         self._message: discord.Message = message
@@ -31,6 +33,10 @@ class SearchResults:
     @tracks.setter
     def tracks(self, value: list[Track]) -> None:
         self._tracks = value
+
+    @property
+    def query(self) -> str:
+        return self._query
 
     @property
     def shuffle(self) -> bool:

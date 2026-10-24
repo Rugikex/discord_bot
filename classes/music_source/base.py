@@ -10,7 +10,7 @@ from constants import BASE_DIR
 if TYPE_CHECKING:
     from classes.my_client import MyClient
     from classes.track import Track
-    from collections.abc import Awaitable, Callable
+    from classes.search_view import OnSelect
 
 
 ASSETS_FOLDER: Path = BASE_DIR / "assets"
@@ -44,7 +44,7 @@ class MusicSource(ABC):
         interaction: discord.Interaction[MyClient],
         shuffle: bool,
         position: int | None,
-        create_button_select: Callable[[int, str], Awaitable[discord.ui.Button]],
+        on_select: OnSelect,
     ) -> list[Track]:
         pass
 

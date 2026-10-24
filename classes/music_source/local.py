@@ -6,19 +6,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from discord import Color
-from discord.ui import View
 from thefuzz import fuzz
 
 from .base import MusicSource
 from classes.track import Track
 from classes.search_results import SearchResults
+from classes.search_view import show_search_results
 from constants import BASE_DIR
 import my_functions
 
 if TYPE_CHECKING:
     from classes.my_client import MyClient
     from classes.guild_player import GuildPlayer
-    from collections.abc import Awaitable, Callable
+    from classes.search_view import OnSelect
     import discord
 
 
@@ -88,7 +88,7 @@ class LocalSource(MusicSource):
         interaction: discord.Interaction[MyClient],
         shuffle: bool,
         position: int | None,
-        create_button_select: Callable[[int, str], Awaitable[discord.ui.Button]],
+        on_select: OnSelect,
     ) -> list[Track]:
         files: list[Path] = list_local_files()
         player: GuildPlayer = interaction.client.get_player(interaction.guild_id)
@@ -128,19 +128,11 @@ class LocalSource(MusicSource):
             return []
 
         search_results: SearchResults = SearchResults(
-            searches, shuffle, interaction.user, message, position
+            searches, query, shuffle, interaction.user, message, position
         )
         player.search_results = search_results
 
-        msg_content: str = "Select a track with buttons.\n\n"
-        for i, track in enumerate(searches):
-            msg_content += f"**{i + 1}:** {track}\n"
-
-        view: View = View()
-        for i in range(len(searches)):
-            view.add_item(await create_button_select(i, query))
-
-        await my_functions.edit_message(message, content=msg_content, view=view)
+        await show_search_results(search_results, on_select)
         return []
 
     async def get_stream_url(self, track: Track) -> tuple[str | None, dict[str, str]]:

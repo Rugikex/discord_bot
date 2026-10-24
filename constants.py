@@ -8,6 +8,8 @@ SKIP_TIMER: float = 10.0
 ADD_QUEUE_TIMER: float = 5.0
 
 SONG_REACTIONS: list[str] = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
+# Seconds before the buttons of a search expire (its message is then deleted)
+SEARCH_TIMEOUT: float = 180.0
 QUEUE_REACTIONS: list[str] = ["⬆️", "⬇️"]
 
 MSG_BLACKLIST: str = "Sorry, you can't use this bot."
