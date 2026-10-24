@@ -1,7 +1,6 @@
 black
+davey
 discord.py
-ffmpeg-python
-google-api-python-client
 mutagen
 PyNaCl
 python-dotenv

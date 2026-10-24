@@ -85,16 +85,3 @@ formatter: ColorFormatter = ColorFormatter(
 handler.setFormatter(formatter)
 my_logger.addHandler(handler)
 my_logger.setLevel(logging.INFO)
-
-ydl_opts = {
-    "audio-quality": 0,
-    "simulate": True,
-    "extract-audio": True,
-    "format": "bestaudio",
-    "fps": None,
-    "logger": YDLLogger(),
-    "youtube_include_dash_manifest": False,
-    "ignoreerrors": True,
-    "ratelimit": 1_000_000,
-    "concurrent_fragment_downloads": 1,
-}

@@ -14,6 +14,10 @@ class AudioSourceTracked(discord.AudioSource):
             self._count_20ms += 1
         return data
 
+    def cleanup(self) -> None:
+        # Kill the ffmpeg process as soon as the track stops
+        self._source.cleanup()
+
     @property
     def progress_datetime(self) -> datetime.timedelta:
         return datetime.timedelta(seconds=self._count_20ms * 0.02)

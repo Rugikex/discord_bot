@@ -1,13 +1,15 @@
 from __future__ import annotations
+import asyncio
 from typing import TYPE_CHECKING
 
+import discord
+
 from classes.current_track import CurrentTrack
+from classes.music_source import MUSIC_SOURCES
 from classes.track_queue import TrackQueue
 import my_functions
 
 if TYPE_CHECKING:
-    import discord
-
     from classes.audio_source_tracked import AudioSourceTracked
     from classes.search_results import SearchResults
     from classes.track import Track
@@ -15,11 +17,19 @@ if TYPE_CHECKING:
 
 class Server:
     def __init__(
-        self, server_id: int, default_platform: str, default_tracks: str
+        self,
+        server_id: int,
+        default_platform: str,
+        default_tracks: dict[str, str | None],
+        welcome_track: dict[str, str | None] | None = None,
     ) -> None:
         self._server_id: int = server_id
         self._default_platform: str = default_platform
-        self._default_tracks: dict[str, str] = default_tracks
+        self._default_tracks: dict[str, str | None] = default_tracks
+        # Played once, before the first track of the connection
+        self._welcome_track: dict[str, str | None] | None = welcome_track
+        # Prevents two coroutines from starting a track at the same time
+        self.play_lock: asyncio.Lock = asyncio.Lock()
         self._current_track: CurrentTrack | None = None
         self._search_results: SearchResults | None = None
         self._track_queue: TrackQueue = TrackQueue()
@@ -36,12 +46,18 @@ class Server:
         return self._default_platform
 
     @property
-    def default_tracks(self) -> dict[str, str]:
+    def default_tracks(self) -> dict[str, str | None]:
         return self._default_tracks
 
     @property
     def current_track(self) -> CurrentTrack | None:
         return self._current_track
+
+    def pop_welcome_track(self) -> dict[str, str | None] | None:
+        """Return the welcome track settings the first time only."""
+        welcome_track: dict[str, str | None] | None = self._welcome_track
+        self._welcome_track = None
+        return welcome_track
 
     async def update_current_track(
         self,
@@ -52,7 +68,9 @@ class Server:
         message: discord.Message | None
         embed: discord.Embed
         file: discord.File
-        embed, file = my_functions.create_embed(track, self._loop_requester)
+        embed, file = MUSIC_SOURCES[track.origin].create_embed(
+            track, self._loop_requester
+        )
 
         if self._current_track is None:
             message = await my_functions.send_by_channel(
@@ -65,15 +83,12 @@ class Server:
             self._current_track = CurrentTrack(track, message, audio)
             return
 
-        last_message: discord.Message | None
+        last_message: discord.Message | None = None
         try:
             if hasattr(interaction.channel, "history"):
-                last_message = [
-                    message async for message in interaction.channel.history(limit=1)
-                ][0]
-            else:
-                last_message = None
-        except discord.errors.Forbidden:
+                async for message in interaction.channel.history(limit=1):
+                    last_message = message
+        except discord.errors.HTTPException:
             last_message = None
 
         if (
@@ -131,6 +146,9 @@ class Server:
 
     def switch_looping(self, requester: str) -> None:
         self._loop_requester = requester if self._loop_requester is None else None
+
+    def stop_looping(self) -> None:
+        self._loop_requester = None
 
     @property
     def loop_requester(self) -> str | None:

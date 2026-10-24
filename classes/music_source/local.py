@@ -1,6 +1,7 @@
 from __future__ import annotations
+import asyncio
 from datetime import timedelta
-from mutagen import File
+from mutagen import File, MutagenError
 import os
 from typing import TYPE_CHECKING
 
@@ -11,35 +12,81 @@ from thefuzz import fuzz
 from .base import MusicSource
 from classes.track import Track
 from classes.search_results import SearchResults
-import config
 import my_functions
 
-
 if TYPE_CHECKING:
+    from classes.my_client import MyClient
     from classes.server import Server
     from collections.abc import Awaitable, Callable
     import discord
 
 
-class ServerSource(MusicSource):
+MUSIC_FOLDER: str = "music"
+AUDIO_EXTENSIONS: tuple[str, ...] = (".mp3", ".wav", ".flac")
+
+
+def list_local_files() -> list[str]:
+    if not os.path.isdir(MUSIC_FOLDER):
+        return []
+    return [f for f in os.listdir(MUSIC_FOLDER) if f.lower().endswith(AUDIO_EXTENSIONS)]
+
+
+def load_local_track(
+    path: str, requester: discord.User | discord.Member
+) -> Track | None:
+    """Blocking (reads the file): run it in an executor."""
+    try:
+        audio = File(path)
+    except (MutagenError, OSError):
+        return None
+    if audio is None or audio.info is None:
+        return None
+
+    return Track(
+        os.path.splitext(os.path.basename(path))[0],
+        timedelta(seconds=int(audio.info.length)),
+        path,
+        "local",
+        requester,
+    )
+
+
+def load_local_tracks(
+    file_names: list[str], requester: discord.User | discord.Member
+) -> list[Track]:
+    """Blocking (reads files): run it in an executor."""
+    tracks: list[Track] = []
+    for file_name in file_names:
+        track: Track | None = load_local_track(f"{MUSIC_FOLDER}/{file_name}", requester)
+        if track is not None:
+            tracks.append(track)
+    return tracks
+
+
+class LocalSource(MusicSource):
     color: Color = Color.from_str("#1F3F68")
     logo: str = "server-logo.png"
 
     def get_url(self, track: Track) -> str | None:
         return None
 
+    async def get_track(
+        self, link: str, requester: discord.User | discord.Member
+    ) -> Track | None:
+        return await asyncio.get_running_loop().run_in_executor(
+            None, load_local_track, link, requester
+        )
+
     async def search(
         self,
         query: str,
-        interaction: discord.Interaction,
+        interaction: discord.Interaction[MyClient],
         shuffle: bool,
         position: int | None,
         create_button_select: Callable[[int, str], Awaitable[discord.ui.Button]],
     ) -> list[Track]:
-        files = [
-            f for f in os.listdir("music") if f.endswith((".mp3", ".wav", ".flac"))
-        ]
-        server: Server = config.client_bot.get_server(interaction.guild_id)
+        files: list[str] = list_local_files()
+        server: Server = interaction.client.get_server(interaction.guild_id)
 
         if server.search_results is not None:
             await my_functions.delete_msg(server.search_results.message)
@@ -66,17 +113,14 @@ class ServerSource(MusicSource):
         matches = [match["file"] for match in matches]
         matches = matches[:5]
 
-        searches: list[Track] = []
-        match: str
-        for match in matches:
-            track = Track(
-                match,
-                timedelta(seconds=int(File(f"music/{match}").info.length)),
-                f"music/{match}",
-                "server",
-                interaction.user,
+        searches: list[Track] = await asyncio.get_running_loop().run_in_executor(
+            None, load_local_tracks, matches, interaction.user
+        )
+        if not searches:
+            await my_functions.edit_message(
+                message, content=f'No track found for "{query}".', delete_after=10.0
             )
-            searches.append(track)
+            return []
 
         search_results: SearchResults = SearchResults(
             searches, shuffle, interaction.user, message, position

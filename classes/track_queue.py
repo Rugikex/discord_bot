@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING
 import discord
 
 from classes.track import Track
-import config
 from constants import QUEUE_REACTIONS
 import my_functions
 import voice_gestion
 
 if TYPE_CHECKING:
     from classes.current_track import CurrentTrack
+    from classes.my_client import MyClient
     from classes.server import Server
 
 
@@ -21,7 +21,6 @@ class TrackQueue:
     def __init__(self) -> None:
         self._tracks: list[Track] = []
         self._message: discord.Message | None = None
-        self._is_new: bool = True
 
     def has_next_track(self) -> bool:
         return len(self._tracks) > 0
@@ -34,31 +33,29 @@ class TrackQueue:
     def queue_size(self) -> int:
         return len(self._tracks)
 
-    async def clear_queue(self, interaction: discord.Interaction | None) -> None:
+    async def clear_queue(self, interaction: discord.Interaction | None) -> bool:
         if interaction is not None:
             voice_client: discord.VoiceClient | None = (
                 await voice_gestion.check_voice_client(interaction)
             )
             if voice_client is None:
-                return
+                return False
 
         self._tracks = []
+        return True
 
     async def delete_message(self) -> None:
         await my_functions.delete_msg(self._message)
         self._message = None
 
-    def get_queue_total_time(self, guild_id: int | None) -> datetime.timedelta:
-        if guild_id is None:
-            raise ValueError("Server ID must not be None")
-
+    def get_queue_total_time(
+        self, current_track: CurrentTrack | None
+    ) -> datetime.timedelta:
         res: datetime.timedelta = datetime.timedelta(0)
         item: Track
         for item in self._tracks:
             res += item.duration
 
-        server: Server = config.client_bot.get_server(guild_id)
-        current_track: CurrentTrack | None = server.current_track
         if current_track is not None:
             res += current_track.track.duration
             res -= current_track.audio.progress_datetime
@@ -75,8 +72,8 @@ class TrackQueue:
         if (
             new_position < 1
             or position < 1
-            or len(self._tracks) + 1 < position
-            or len(self._tracks) + 1 < new_position
+            or position > len(self._tracks)
+            or new_position > len(self._tracks)
         ):
             await my_functions.send_by_channel(
                 interaction.channel, "Numbers are incorrect!"
@@ -199,34 +196,23 @@ class TrackQueue:
         if shuffle:
             await self.shuffle_queue(interaction)
 
-        if self._is_new:
-            # TODO: remove hardcoded track
-            wololo: Track = Track(
-                "Welcome",
-                datetime.timedelta(seconds=2),
-                "https://www.youtube.com/watch?v=hSU0Z3_466s",
-                "youtube",
-                interaction.user,
-            )
-            self._tracks.insert(0, wololo)
-            self._is_new = False
-
-    async def shuffle_queue(self, interaction: discord.Interaction):
+    async def shuffle_queue(self, interaction: discord.Interaction) -> bool:
         voice_client: discord.VoiceClient = await voice_gestion.get_voice_client(
             interaction
         )
         if voice_client is None:
-            return
+            return False
 
         random.seed()
         random.shuffle(self._tracks)
+        return True
 
     def create_message_content(
-        self, interaction: discord.Interaction, page: int
+        self, interaction: discord.Interaction[MyClient], page: int
     ) -> str:
-        number_tracks: int = 1
         max_page: int = max(math.ceil(len(self._tracks) / 10), 1)
-        server: Server = config.client_bot.get_server(interaction.guild_id)
+        server: Server = interaction.client.get_server(interaction.guild_id)
+        number_tracks: int = 0 if server.current_track is None else 1
         msg_content: str = f"Queue list (page {page}/{max_page}):\n"
         if page == 1 and server.current_track is not None:
             current_track: CurrentTrack = server.current_track
@@ -243,7 +229,7 @@ class TrackQueue:
 
         msg_content += (
             f"__Total tracks:__ {number_tracks}\n"
-            f"__Total time:__ {self.get_queue_total_time(interaction.guild_id)}"
+            f"__Total time:__ {self.get_queue_total_time(server.current_track)}"
         )
         return msg_content
 
@@ -252,8 +238,8 @@ class TrackQueue:
         button: discord.ui.Button = discord.ui.Button(emoji=QUEUE_REACTIONS[0])
 
         async def button_callback_down(interaction: discord.Interaction) -> None:
-            await self.get_queue(interaction, page - 1, is_new=False)
             await interaction.response.defer()
+            await self.get_queue(interaction, page - 1, is_new=False)
 
         button.callback = button_callback_down
         if page == 1:
@@ -262,7 +248,8 @@ class TrackQueue:
 
         button = discord.ui.Button(emoji=QUEUE_REACTIONS[1])
 
-        async def button_callback_up(interaction: discord.Interaction):
+        async def button_callback_up(interaction: discord.Interaction) -> None:
+            await interaction.response.defer()
             await self.get_queue(interaction, page + 1, is_new=False)
 
         button.callback = button_callback_up
@@ -286,7 +273,7 @@ class TrackQueue:
 
         await my_functions.edit_message(message, view=view)
 
-    async def stop_track(self, interaction: discord.Interaction) -> None:
+    async def stop_track(self, interaction: discord.Interaction[MyClient]) -> None:
         voice_client: discord.VoiceClient = await voice_gestion.get_voice_client(
             interaction
         )
@@ -294,6 +281,9 @@ class TrackQueue:
             return
 
         self._tracks: list[Track] = []
+        server: Server | None = interaction.client.find_server(interaction.guild_id)
+        if server is not None:
+            server.stop_looping()
 
         voice_client.stop()
         await my_functions.send_by_channel(

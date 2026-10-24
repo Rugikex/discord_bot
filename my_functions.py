@@ -1,16 +1,7 @@
 from __future__ import annotations
-import asyncio
-from typing import Union, TYPE_CHECKING
+from typing import Union
 
 import discord
-
-import config
-
-if TYPE_CHECKING:
-    from classes.music_source import MusicSource
-    from classes.server import Server
-    from classes.track import Track
-
 
 InteractionChannel = Union[
     discord.VoiceChannel,
@@ -134,61 +125,6 @@ async def delete_msg(
         await message.delete()
     except (discord.errors.NotFound, discord.errors.HTTPException):
         pass
-
-
-async def disconnect_bot(
-    voice_client: discord.VoiceClient, guild_id: int | None
-) -> None:
-    if guild_id is None:
-        return
-
-    server: Server = config.client_bot.get_server(guild_id)
-    if server.is_disconnected:
-        return
-
-    config.client_bot.remove_server(guild_id)
-    server.disconnect()
-    await server.track_queue.clear_queue(None)
-
-    voice_client.stop()
-    await asyncio.sleep(1.0)  # Wait for the track to stop
-
-    await voice_client.disconnect()
-    await server.clear()
-
-    if config.client_bot.is_using_youtube == guild_id:
-        config.client_bot.server_id_using_youtube = None
-
-    config.my_logger.info(f"Bot disconnects to {voice_client.guild.name}.")
-
-
-def user_is_blacklisted(user_id: int) -> bool:
-    return user_id in config.client_bot.blacklist
-
-
-def create_embed(
-    track: Track, loop_requester: str | None
-) -> tuple[discord.Embed, discord.File]:
-    """Create a discord embed and a discord file with logo."""
-    music_source: MusicSource = config.MUSIC_SOURCES[track.origin]
-    color: discord.Color = music_source.color
-    logo_name: str = music_source.logo
-    url: str | None = music_source.get_url(track)
-
-    file: discord.File = discord.File(f"assets/{logo_name}", filename=logo_name)
-
-    embed: discord.Embed = discord.Embed(title=track.title, url=url, color=color)
-    embed.set_author(name="Playing", icon_url=f"attachment://{logo_name}")
-    loop_str: str = (
-        f"✅ made by {loop_requester}" if loop_requester is not None else "❌"
-    )
-    embed.description = (
-        f"Duration: {track.duration}\n"
-        f"Loop: {loop_str}\n"
-        f"Requested by {track.requester.mention}"
-    )
-
-    return embed, file
 
 
 # Not use

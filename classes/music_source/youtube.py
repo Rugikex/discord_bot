@@ -1,24 +1,36 @@
 from __future__ import annotations
+import asyncio
 import datetime
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from discord import Color
 from discord.ui import View
 from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadError
 
 from .base import MusicSource
 from classes.search_results import SearchResults
 from classes.track import Track
-import config
+from logger_setup import YDLLogger, my_logger
 import my_functions
 
 if TYPE_CHECKING:
+    from classes.my_client import MyClient
     from classes.server import Server
     from collections.abc import Awaitable, Callable
 
     import discord
 
+
+YDL_STREAM_OPTIONS: dict[str, Any] = {
+    "simulate": True,
+    "format": "bestaudio/best",
+    "noplaylist": True,
+    "logger": YDLLogger(),
+    "youtube_include_dash_manifest": False,
+    "ignoreerrors": True,
+}
 
 FFMPEG_OPTIONS: dict[str, str] = {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 3",
@@ -39,6 +51,53 @@ YOUTUBE_VIDEO_WITH_LIST_REGEX: re.Pattern[str] = re.compile(
 )
 
 
+def _extract_flat(url: str) -> dict[str, Any] | None:
+    """Blocking (network): run it in an executor."""
+    ydl_opts: dict[str, Any] = {
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": True,
+    }
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            return ydl.extract_info(url, download=False)
+    except DownloadError as error:
+        my_logger.warning("yt-dlp can't extract %s: %s", url, error)
+        return None
+
+
+def _extract_stream(url: str) -> dict[str, Any] | None:
+    """Blocking (network): run it in an executor."""
+    try:
+        with YoutubeDL(YDL_STREAM_OPTIONS) as ydl:
+            return ydl.extract_info(url)
+    except DownloadError as error:
+        my_logger.warning("yt-dlp can't get stream of %s: %s", url, error)
+        return None
+
+
+def _entries_to_tracks(
+    info: dict[str, Any] | None, requester: discord.User | discord.Member
+) -> list[Track]:
+    if not info:
+        return []
+
+    tracks: list[Track] = []
+    for entry in info.get("entries") or []:
+        if not entry or entry.get("duration") is None:
+            continue
+        tracks.append(
+            Track(
+                entry.get("title", ""),
+                datetime.timedelta(seconds=entry["duration"]),
+                entry.get("url", ""),
+                "youtube",
+                requester,
+            )
+        )
+    return tracks
+
+
 class YoutubeSource(MusicSource):
     color: Color = Color.red()
     logo: str = "youtube-logo.png"
@@ -46,16 +105,22 @@ class YoutubeSource(MusicSource):
     def get_url(self, track: Track) -> str | None:
         return track.link
 
+    async def get_track(
+        self, link: str, requester: discord.User | discord.Member
+    ) -> Track | None:
+        tracks: list[Track] = await self._single_link(link, requester)
+        return tracks[0] if tracks else None
+
     async def search(
         self,
         query: str,
-        interaction: discord.Interaction,
+        interaction: discord.Interaction[MyClient],
         shuffle: bool,
         position: int | None,
         create_button_select: Callable[[int, str], Awaitable[discord.ui.Button]],
     ) -> list[Track]:
         message: discord.Message | None
-        server: Server = config.client_bot.get_server(interaction.guild_id)
+        server: Server = interaction.client.get_server(interaction.guild_id)
         tracks: list[Track] = []
 
         if YOUTUBE_PLAYLIST_REGEX.search(query) is not None:
@@ -80,7 +145,7 @@ class YoutubeSource(MusicSource):
                 permanent=True,
             )
 
-            searches: list[Track] = self._specific_search(query, interaction.user)
+            searches: list[Track] = await self._specific_search(query, interaction.user)
 
             if not searches:
                 await my_functions.edit_message(
@@ -125,57 +190,38 @@ class YoutubeSource(MusicSource):
         return tracks
 
     async def get_stream_url(self, track: Track) -> tuple[str | None, dict[str, str]]:
-        with YoutubeDL(config.ydl_opts) as ydl:
-            info: dict = await config.client_bot.loop.run_in_executor(
-                None, ydl.extract_info, track.link
-            )
+        info: dict[str, Any] | None = await asyncio.get_running_loop().run_in_executor(
+            None, _extract_stream, track.link
+        )
 
         url: str | None = None
         if info:
-            for info_format in info["formats"]:
-                if "asr" not in info_format:
-                    continue
-                url = info_format["url"]
-                break
+            # "url" is the format selected by ydl_opts["format"] (bestaudio)
+            url = info.get("url")
+            if url is None:
+                # Formats are sorted from worst to best
+                for info_format in reversed(info.get("formats") or []):
+                    if info_format.get("acodec") not in (None, "none"):
+                        url = info_format.get("url")
+                        break
         return url, FFMPEG_OPTIONS
 
-    def _specific_search(
+    async def _specific_search(
         self, query: str, requester: discord.User | discord.Member
     ) -> list[Track]:
-        ydl_opts: dict = {
-            "quiet": True,
-            "extract_flat": True,
-        }
-
-        with YoutubeDL(ydl_opts) as ydl:
-            search_url: str = f"ytsearch5:{query}"
-            info: dict = ydl.extract_info(search_url, download=False)
-
-        tracks: list[Track] = []
-        for entry in info.get("entries", []):
-            if entry.get("duration") is None:
-                continue
-            tracks.append(
-                Track(
-                    entry.get("title", ""),
-                    datetime.timedelta(seconds=entry.get("duration", 0)),
-                    entry.get("url", ""),
-                    "youtube",
-                    requester,
-                )
-            )
-
-        return tracks
+        info: dict[str, Any] | None = await asyncio.get_running_loop().run_in_executor(
+            None, _extract_flat, f"ytsearch5:{query}"
+        )
+        return _entries_to_tracks(info, requester)
 
     async def _single_link(
         self, video_url: str, requester: discord.User | discord.Member
     ) -> list[Track]:
-        ydl_opts = {"quiet": True, "extract_flat": True}
+        info: dict[str, Any] | None = await asyncio.get_running_loop().run_in_executor(
+            None, _extract_flat, video_url
+        )
 
-        with YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=False)
-
-        if info.get("duration") is None:
+        if not info or info.get("duration") is None:
             return []
         return [
             Track(
@@ -195,37 +241,16 @@ class YoutubeSource(MusicSource):
         return url
 
     async def _playlist_link(
-        self, playlist_url: str, interaction: discord.Interaction
+        self, playlist_url: str, interaction: discord.Interaction[MyClient]
     ) -> list[Track]:
         normalized_url: str = self._normalize_youtube_url(playlist_url)
 
-        server: Server = config.client_bot.get_server(interaction.guild_id)
-        if server is None:
-            return []
+        server: Server = interaction.client.get_server(interaction.guild_id)
 
-        ydl_opts = {"quiet": True, "extract_flat": True}
-
-        def extract_info(url: str) -> dict:
-            with YoutubeDL(ydl_opts) as ydl:
-                info: dict = ydl.extract_info(url, download=False)
-            return info
-
-        info: dict = await config.client_bot.loop.run_in_executor(
-            None, extract_info, normalized_url
+        info: dict[str, Any] | None = await asyncio.get_running_loop().run_in_executor(
+            None, _extract_flat, normalized_url
         )
-
-        tracks: list[Track] = []
-        for entry in info.get("entries", []):
-            if entry.get("duration") is None:
-                continue
-            track = Track(
-                entry.get("title", ""),
-                datetime.timedelta(seconds=entry.get("duration", 0)),
-                entry.get("url", ""),
-                "youtube",
-                interaction.user,
-            )
-            tracks.append(track)
+        tracks: list[Track] = _entries_to_tracks(info, interaction.user)
 
         await my_functions.delete_msg(server.loading_playlist_message)
         server.loading_playlist_message = None
