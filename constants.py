@@ -2,7 +2,6 @@ from typing import Any
 
 SKIP_TIMER: float = 10.0
 ADD_QUEUE_TIMER: float = 5.0
-SAVE_SETTINGS_TIMER: float = 300.0
 
 SONG_REACTIONS: list[str] = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
 QUEUE_REACTIONS: list[str] = ["⬆️", "⬇️"]

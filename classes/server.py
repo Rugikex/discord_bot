@@ -45,6 +45,10 @@ class Server:
     def default_platform(self) -> str:
         return self._default_platform
 
+    @default_platform.setter
+    def default_platform(self, value: str) -> None:
+        self._default_platform = value
+
     @property
     def default_tracks(self) -> dict[str, str | None]:
         return self._default_tracks

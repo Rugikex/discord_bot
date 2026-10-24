@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import discord
 from discord import app_commands
@@ -10,16 +10,27 @@ import voice_gestion
 
 if TYPE_CHECKING:
     from classes.current_track import CurrentTrack
+    from classes.music_source import MusicSource
     from classes.my_client import MyClient
     from classes.server import Server
     from classes.track import Track
     from classes.track_queue import TrackQueue
 
 
+PLATFORM_CHOICES: list[app_commands.Choice[str]] = [
+    app_commands.Choice(name="YouTube", value="youtube"),
+    app_commands.Choice(name="Local files", value="local"),
+]
+
+
 def add_commands(tree: app_commands.CommandTree) -> None:
-    """Register every slash command of this module on the tree."""
+    """Register every slash command and group of this module on the tree."""
     for value in globals().values():
-        if isinstance(value, app_commands.Command):
+        # Subcommands are registered through their group
+        if (
+            isinstance(value, (app_commands.Command, app_commands.Group))
+            and value.parent is None
+        ):
             tree.add_command(value)
 
 
@@ -40,6 +51,7 @@ async def msg_help(interaction: discord.Interaction) -> None:
         "`queue (number)`: Display the queue.\n"
         "`remove begin (end)`: Remove `begin` track or [`begin`, `end`] tracks.\n"
         "`resume`: Resume current track.\n"
+        "`settings`: Display or change the settings of this server.\n"
         "`shuffle`: Shuffle tracks.\n"
         "`skip (number)`: Skip the current track or first 'number' tracks.\n"
         "`stop`: Stop current track.\n"
@@ -170,12 +182,7 @@ async def cmd_pause(interaction: discord.Interaction) -> None:
 
 
 @app_commands.command(name="play", description="Play url/playlist or search terms.")
-@app_commands.choices(
-    platform=[
-        app_commands.Choice(name="YouTube", value="youtube"),
-        app_commands.Choice(name="Local files", value="local"),
-    ]
-)
+@app_commands.choices(platform=PLATFORM_CHOICES)
 @app_commands.guild_only()
 async def cmd_play(
     interaction: discord.Interaction,
@@ -218,12 +225,7 @@ async def cmd_play_default(
     name="play_next",
     description="Play this track after the current one. (can shuffle new track added)",
 )
-@app_commands.choices(
-    platform=[
-        app_commands.Choice(name="YouTube", value="youtube"),
-        app_commands.Choice(name="Local files", value="local"),
-    ]
-)
+@app_commands.choices(platform=PLATFORM_CHOICES)
 @app_commands.guild_only()
 async def cmd_play_next(
     interaction: discord.Interaction,
@@ -235,12 +237,7 @@ async def cmd_play_next(
 
 
 @app_commands.command(name="play_shuffle", description="Play and shuffle tracks.")
-@app_commands.choices(
-    platform=[
-        app_commands.Choice(name="YouTube", value="youtube"),
-        app_commands.Choice(name="Local files", value="local"),
-    ]
-)
+@app_commands.choices(platform=PLATFORM_CHOICES)
 @app_commands.guild_only()
 async def cmd_play_shuffle(
     interaction: discord.Interaction,
@@ -323,3 +320,114 @@ async def cmd_stop(interaction: discord.Interaction) -> None:
         return
     track_queue: TrackQueue = server.track_queue
     await track_queue.stop_track(interaction)
+
+
+settings_group: app_commands.Group = app_commands.Group(
+    name="settings",
+    description="Display or change the settings of this server.",
+    guild_only=True,
+    # Server admins can change who sees it in Server Settings > Integrations
+    default_permissions=discord.Permissions(manage_guild=True),
+)
+
+
+def format_track_setting(value: dict[str, str | None] | None) -> str:
+    if not value or not value.get("link"):
+        return "None"
+    return f"`{value['link']}` ({value.get('platform') or 'default platform'})"
+
+
+@settings_group.command(name="show", description="Display the settings.")
+async def cmd_settings_show(interaction: discord.Interaction[MyClient]) -> None:
+    settings: dict[str, Any] = interaction.client.load_settings(interaction.guild_id)
+    await my_functions.send_by_interaction(
+        interaction,
+        f"**Default platform:** {settings['default_platform']}\n"
+        f"**Default tracks:** {format_track_setting(settings['default_tracks'])}\n"
+        f"**Welcome track:** {format_track_setting(settings['welcome_track'])}",
+    )
+
+
+@settings_group.command(
+    name="default_platform", description="Platform used when none is chosen."
+)
+@app_commands.choices(platform=PLATFORM_CHOICES)
+async def cmd_settings_default_platform(
+    interaction: discord.Interaction[MyClient], platform: app_commands.Choice[str]
+) -> None:
+    interaction.client.update_setting(
+        interaction.guild_id, "default_platform", platform.value
+    )
+    await my_functions.send_by_interaction(
+        interaction, f"Default platform set to {platform.name}."
+    )
+
+
+@settings_group.command(
+    name="default_tracks",
+    description="Tracks played by /play_default (without link to remove them).",
+)
+@app_commands.describe(link="Url, playlist or search terms.")
+@app_commands.choices(platform=PLATFORM_CHOICES)
+async def cmd_settings_default_tracks(
+    interaction: discord.Interaction[MyClient],
+    link: str | None = None,
+    platform: app_commands.Choice[str] | None = None,
+) -> None:
+    interaction.client.update_setting(
+        interaction.guild_id,
+        "default_tracks",
+        {"link": link, "platform": platform.value if platform else None},
+    )
+    await my_functions.send_by_interaction(
+        interaction,
+        (
+            "Default tracks removed."
+            if link is None
+            else f"Default tracks set to `{link}`."
+        ),
+    )
+
+
+@settings_group.command(
+    name="welcome_track",
+    description="Track played when the bot joins a channel (without link to disable).",
+)
+@app_commands.describe(link="Url of one track, or path of a local file (music/...).")
+@app_commands.choices(platform=PLATFORM_CHOICES)
+async def cmd_settings_welcome_track(
+    interaction: discord.Interaction[MyClient],
+    link: str | None = None,
+    platform: app_commands.Choice[str] | None = None,
+) -> None:
+    if link is None:
+        interaction.client.update_setting(
+            interaction.guild_id, "welcome_track", {"link": None, "platform": None}
+        )
+        await my_functions.send_by_interaction(interaction, "Welcome track disabled.")
+        return
+
+    platform_value: str = (
+        platform.value
+        if platform
+        else interaction.client.load_settings(interaction.guild_id)["default_platform"]
+    )
+    music_source: MusicSource | None = MUSIC_SOURCES.get(platform_value)
+    # Check the link now rather than failing silently at the next connection
+    track: Track | None = (
+        await music_source.get_track(link, interaction.user) if music_source else None
+    )
+    if track is None:
+        await my_functions.send_by_interaction(
+            interaction, f"Can't find a single track for `{link}`."
+        )
+        return
+
+    interaction.client.update_setting(
+        interaction.guild_id,
+        "welcome_track",
+        {"link": link, "platform": platform_value},
+    )
+    await my_functions.send_by_interaction(
+        interaction, f'Welcome track set to "{track}" (from the next connection).'
+    )
