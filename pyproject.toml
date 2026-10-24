@@ -1,0 +1,30 @@
+[tool.black]
+target-version = ["py312"]
+
+[tool.ruff]
+target-version = "py312"
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP"]
+# Line length is handled by black
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+# classes/ has no __init__.py
+explicit_package_bases = true
+exclude = ["^\\.venv/"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+# Every redefined method must be marked with @override (typo protection)
+enable_error_code = ["explicit-override"]
+
+[[tool.mypy.overrides]]
+# Libraries without type hints
+module = ["mutagen.*", "thefuzz.*", "yt_dlp.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

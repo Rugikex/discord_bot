@@ -3,12 +3,12 @@ import asyncio
 from datetime import timedelta
 from mutagen import File, MutagenError
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from discord import Color
 from thefuzz import fuzz
 
-from .base import MusicSource
+from .base import FFmpegOptions, MusicSource
 from classes.track import Track
 from constants import BASE_DIR, MAX_SEARCH_RESULTS
 
@@ -70,14 +70,17 @@ class LocalSource(MusicSource):
     color: Color = Color.from_str("#1F3F68")
     logo: str = "server-logo.png"
 
+    @override
     def get_url(self, track: Track) -> str | None:
         return None
 
+    @override
     async def get_track(
         self, link: str, requester: discord.User | discord.Member
     ) -> Track | None:
         return await asyncio.to_thread(load_local_track, link, requester)
 
+    @override
     async def search(
         self, query: str, requester: discord.User | discord.Member
     ) -> list[Track]:
@@ -91,5 +94,6 @@ class LocalSource(MusicSource):
 
         return await asyncio.to_thread(load_local_tracks, best_paths, requester)
 
-    async def get_stream_url(self, track: Track) -> tuple[str | None, dict[str, str]]:
+    @override
+    async def get_stream_url(self, track: Track) -> tuple[str | None, FFmpegOptions]:
         return track.link, {"options": "-vn -loglevel quiet"}

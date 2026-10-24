@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, override
 
 
 class ColorFormatter(logging.Formatter):
@@ -17,11 +17,13 @@ class ColorFormatter(logging.Formatter):
         logging.CRITICAL: "\033[1;31m",
     }
 
+    @override
     def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
         """Override formatTime to color the date"""
         original_time: str = super().formatTime(record, datefmt)
         return f"{self.GRAY}{original_time}{self.RESET}"
 
+    @override
     def format(self, record: logging.LogRecord) -> str:
         # Align levelname to 8 characters for consistent formatting
         levelname_raw: str = record.levelname

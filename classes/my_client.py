@@ -3,9 +3,9 @@ import asyncio
 import copy
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
-from discord import Client, utils
+from discord import Client
 
 from classes.my_command_tree import MyCommandTree
 from classes.guild_player import GuildPlayer
@@ -42,12 +42,13 @@ class MyClient(Client):
         self._blacklist: set[int] = self._get_blacklist()
         self._background_tasks: set[asyncio.Task[None]] = set()
 
+    @override
     async def setup_hook(self) -> None:
         # Called once at login, unlike on_ready which fires on every reconnection
         await self.tree.sync()
 
     async def on_app_command_completion(
-        self, interaction: Interaction, command: Command | ContextMenu
+        self, interaction: Interaction[MyClient], command: Command | ContextMenu
     ) -> None:
         await my_functions.finish_interaction(interaction)
 
@@ -68,8 +69,8 @@ class MyClient(Client):
             return
 
         # Already None if discord.py has handled a kick before this event
-        voice_client: VoiceClient | None = utils.get(
-            self.voice_clients, guild=member.guild
+        voice_client: VoiceClient | None = my_functions.get_guild_voice_client(
+            member.guild
         )
 
         if member == self.user:
@@ -150,7 +151,7 @@ class MyClient(Client):
             if self._read_settings_file(guild_id) != settings:
                 self.save_settings(guild_id, settings)
 
-    def player_exists(self, guild_id: int) -> bool:
+    def player_exists(self, guild_id: int | None) -> bool:
         return guild_id in self._players
 
     def find_player(self, guild_id: int | None) -> GuildPlayer | None:
@@ -158,11 +159,14 @@ class MyClient(Client):
             return None
         return self._players.get(guild_id)
 
-    def get_player(self, guild_id: int | None) -> GuildPlayer:
+    @staticmethod
+    def _require_guild_id(guild_id: int | None) -> int:
         if guild_id is None:
             raise ValueError("Guild ID must not be None")
+        return guild_id
 
-        player: GuildPlayer | None = self._players.get(guild_id)
+    def get_player(self, guild_id: int | None) -> GuildPlayer:
+        player: GuildPlayer | None = self._players.get(self._require_guild_id(guild_id))
         if player is None:
             raise KeyError("Guild player not found")
         return player
@@ -181,9 +185,11 @@ class MyClient(Client):
             return {}
         return settings if isinstance(settings, dict) else {}
 
-    def load_settings(self, guild_id: int) -> dict[str, Any]:
+    def load_settings(self, guild_id: int | None) -> dict[str, Any]:
         """Settings of the guild, completed with the default values."""
-        settings: dict[str, Any] = self._read_settings_file(guild_id)
+        settings: dict[str, Any] = self._read_settings_file(
+            self._require_guild_id(guild_id)
+        )
         return {
             key: settings.get(key, copy.deepcopy(value))
             for key, value in DEFAULT_SETTINGS.items()
@@ -195,7 +201,8 @@ class MyClient(Client):
             json.dumps(settings, indent=4, ensure_ascii=False), encoding="utf-8"
         )
 
-    def update_setting(self, guild_id: int, key: str, value: Any) -> None:
+    def update_setting(self, guild_id: int | None, key: str, value: Any) -> None:
+        guild_id = self._require_guild_id(guild_id)
         settings: dict[str, Any] = self.load_settings(guild_id)
         settings[key] = value
         self.save_settings(guild_id, settings)
@@ -206,9 +213,7 @@ class MyClient(Client):
             player.default_platform = value
 
     def add_player(self, guild_id: int | None) -> None:
-        if guild_id is None:
-            raise ValueError("Guild ID must not be None")
-
+        guild_id = self._require_guild_id(guild_id)
         settings: dict[str, Any] = self.load_settings(guild_id)
         player: GuildPlayer = GuildPlayer(
             guild_id,

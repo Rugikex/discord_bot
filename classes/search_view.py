@@ -1,18 +1,22 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, override
 
 import discord
 
+from classes.callback_button import CallbackButton
 from constants import SEARCH_TIMEOUT, SONG_REACTIONS
 import my_functions
 
 if TYPE_CHECKING:
+    from classes.my_client import MyClient
     from collections.abc import Awaitable, Callable
 
     from classes.search_results import SearchResults
 
-    # Add the chosen track, return False if it can't be selected (yet)
-    OnSelect = Callable[[discord.Interaction, SearchResults, int], Awaitable[bool]]
+# Add the chosen track, return False if it can't be selected (yet)
+type OnSelect = Callable[
+    [discord.Interaction[MyClient], SearchResults, int], Awaitable[bool]
+]
 
 
 class SearchView(discord.ui.View):
@@ -25,18 +29,16 @@ class SearchView(discord.ui.View):
         for number in range(len(search_results.tracks)):
             self.add_item(self._create_button(number))
 
-    def _create_button(self, number: int) -> discord.ui.Button:
-        button: discord.ui.Button = discord.ui.Button(emoji=SONG_REACTIONS[number])
-
-        async def button_callback(interaction: discord.Interaction) -> None:
+    def _create_button(self, number: int) -> CallbackButton:
+        async def select(interaction: discord.Interaction[MyClient]) -> None:
             await interaction.response.defer()
             if await self._on_select(interaction, self._search_results, number):
                 self.stop()  # Only one selection per search
 
-        button.callback = button_callback
-        return button
+        return CallbackButton(select, emoji=SONG_REACTIONS[number])
 
-    async def interaction_check(self, interaction: discord.Interaction, /) -> bool:
+    @override
+    async def interaction_check(self, interaction: discord.Interaction[Any], /) -> bool:
         """Called before every button callback: returning False cancels it."""
         if interaction.user.id == self._search_results.user.id:
             return True
@@ -47,13 +49,16 @@ class SearchView(discord.ui.View):
         )
         return False
 
+    @override
     async def on_timeout(self) -> None:
         # Expired buttons stay visible but fail: remove the whole message
         await self._search_results.delete_message()
 
 
 async def show_search_results(
-    interaction: discord.Interaction, search_results: SearchResults, on_select: OnSelect
+    interaction: discord.Interaction[MyClient],
+    search_results: SearchResults,
+    on_select: OnSelect,
 ) -> None:
     """Send the tracks of a search with a button for each."""
     content: str = "Select a track with buttons.\n\n" + "".join(

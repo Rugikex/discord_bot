@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import discord
 
+from classes.callback_button import CallbackButton
 from classes.track import Track
 from constants import QUEUE_REACTIONS
 import my_functions
@@ -33,7 +34,9 @@ class TrackQueue:
     def queue_size(self) -> int:
         return len(self._tracks)
 
-    async def clear_queue(self, interaction: discord.Interaction | None) -> bool:
+    async def clear_queue(
+        self, interaction: discord.Interaction[MyClient] | None
+    ) -> bool:
         if interaction is not None:
             voice_client: discord.VoiceClient | None = (
                 await voice_gestion.check_voice_client(interaction)
@@ -63,7 +66,10 @@ class TrackQueue:
         return res - datetime.timedelta(microseconds=res.microseconds)
 
     async def move_track(
-        self, interaction: discord.Interaction, position: int, new_position: int
+        self,
+        interaction: discord.Interaction[MyClient],
+        position: int,
+        new_position: int,
     ) -> None:
         if not self._tracks:
             await my_functions.reply(interaction, "Queue is empty!", private=True)
@@ -90,7 +96,7 @@ class TrackQueue:
 
     async def remove_tracks(
         self,
-        interaction: discord.Interaction,
+        interaction: discord.Interaction[MyClient],
         begin: int,
         end: int,
         send_msg: bool = True,
@@ -113,7 +119,7 @@ class TrackQueue:
             await my_functions.reply(interaction, f"Remove {counter} track(s).")
 
     async def get_queue(
-        self, interaction: discord.Interaction, page: int, is_new: bool = True
+        self, interaction: discord.Interaction[MyClient], page: int, is_new: bool = True
     ) -> None:
         voice_client: discord.VoiceClient | None = await voice_gestion.get_voice_client(
             interaction
@@ -154,7 +160,7 @@ class TrackQueue:
 
     async def add_in_queue(
         self,
-        interaction: discord.Interaction,
+        interaction: discord.Interaction[MyClient],
         tracks: list[Track],
         position: int | None,
         content: str,
@@ -194,7 +200,7 @@ class TrackQueue:
         if shuffle:
             await self.shuffle_queue(interaction)
 
-    async def shuffle_queue(self, interaction: discord.Interaction) -> bool:
+    async def shuffle_queue(self, interaction: discord.Interaction[MyClient]) -> bool:
         voice_client: discord.VoiceClient | None = await voice_gestion.get_voice_client(
             interaction
         )
@@ -233,28 +239,25 @@ class TrackQueue:
 
     def create_view_queue(self, page: int) -> discord.ui.View:
         view: discord.ui.View = discord.ui.View()
-        button: discord.ui.Button = discord.ui.Button(emoji=QUEUE_REACTIONS[0])
 
-        async def button_callback_down(interaction: discord.Interaction) -> None:
+        async def previous_page(interaction: discord.Interaction[MyClient]) -> None:
             await interaction.response.defer()
             await self.get_queue(interaction, page - 1, is_new=False)
 
-        button.callback = button_callback_down
-        if page == 1:
-            button.disabled = True
-        view.add_item(button)
-
-        button = discord.ui.Button(emoji=QUEUE_REACTIONS[1])
-
-        async def button_callback_up(interaction: discord.Interaction) -> None:
+        async def next_page(interaction: discord.Interaction[MyClient]) -> None:
             await interaction.response.defer()
             await self.get_queue(interaction, page + 1, is_new=False)
 
-        button.callback = button_callback_up
-        if not self._tracks[page * 10 :]:
-            button.disabled = True
-        view.add_item(button)
-
+        view.add_item(
+            CallbackButton(previous_page, emoji=QUEUE_REACTIONS[0], disabled=page == 1)
+        )
+        view.add_item(
+            CallbackButton(
+                next_page,
+                emoji=QUEUE_REACTIONS[1],
+                disabled=not self._tracks[page * 10 :],
+            )
+        )
         return view
 
     async def create_buttons_on_message_queue(
@@ -278,7 +281,7 @@ class TrackQueue:
         if voice_client is None:
             return
 
-        self._tracks: list[Track] = []
+        self._tracks = []
         player: GuildPlayer | None = interaction.client.find_player(
             interaction.guild_id
         )

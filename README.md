@@ -11,7 +11,7 @@ A Discord music bot with slash commands. It plays YouTube videos and playlists, 
 
 ## Requirements
 
-- **Python 3.10** or newer
+- **Python 3.12** or newer
 - **FFmpeg** installed and available in the `PATH` (`ffmpeg -version` must work)
 - A Discord application with a bot (see below)
 

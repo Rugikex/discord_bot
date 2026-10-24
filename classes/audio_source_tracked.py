@@ -1,4 +1,5 @@
 import datetime
+from typing import override
 
 import discord
 
@@ -8,12 +9,14 @@ class AudioSourceTracked(discord.AudioSource):
         self._source: discord.FFmpegPCMAudio = source
         self._count_20ms: int = 0
 
+    @override
     def read(self) -> bytes:
         data: bytes = self._source.read()
         if data != b"":
             self._count_20ms += 1
         return data
 
+    @override
     def cleanup(self) -> None:
         # Kill the ffmpeg process as soon as the track stops
         self._source.cleanup()

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 import discord
 
@@ -9,42 +9,39 @@ if TYPE_CHECKING:
 # Stored in Interaction.extras once the "thinking..." message is used
 REPLIED_KEY: str = "replied"
 
-InteractionChannel = Union[
-    discord.VoiceChannel,
-    discord.StageChannel,
-    discord.TextChannel,
-    discord.ForumChannel,
-    discord.CategoryChannel,
-    discord.Thread,
-    discord.DMChannel,
-    discord.GroupChannel,
-]
+
+def get_guild_voice_client(guild: discord.Guild | None) -> discord.VoiceClient | None:
+    """Voice client of the bot in a guild, None if it isn't connected."""
+    # Typed as VoiceProtocol by discord.py, the bot only uses VoiceClient
+    voice_client = guild.voice_client if guild is not None else None
+    return voice_client if isinstance(voice_client, discord.VoiceClient) else None
 
 
 async def send_by_channel(
-    channel: InteractionChannel | None,
+    channel: object,
     content: str,
     permanent: bool = False,
-    view: discord.ui.View | None = None,
-    embed: discord.Embed | None = None,
-    file: discord.File | None = None,
+    view: discord.ui.View = discord.utils.MISSING,
+    embed: discord.Embed = discord.utils.MISSING,
+    file: discord.File = discord.utils.MISSING,
 ) -> discord.Message | None:
-    if channel is None:
-        return None
-    delete_after: float | None = None if permanent else 60.0
-
-    if not hasattr(channel, "send"):
+    # None, forums and categories can't receive messages
+    if not isinstance(channel, discord.abc.Messageable):
         return None
 
     try:
-        return await channel.send(
-            content, delete_after=delete_after, view=view, embed=embed, file=file
+        message: discord.Message = await channel.send(
+            content, view=view, embed=embed, file=file
         )
     except discord.errors.HTTPException:
         return None
 
+    if not permanent:
+        await message.delete(delay=60.0)  # Scheduled, doesn't wait
+    return message
 
-def _waits_for_reply(interaction: discord.Interaction) -> bool:
+
+def _waits_for_reply(interaction: discord.Interaction[MyClient]) -> bool:
     """True while the "thinking..." message of a slash command is displayed."""
     return (
         interaction.type is discord.InteractionType.application_command
@@ -78,9 +75,10 @@ async def reply(
                 message = await interaction.edit_original_response(content=content)
         else:
             # Button click or second answer
-            message = await interaction.followup.send(
-                content, ephemeral=private, wait=not private
-            )
+            if private:
+                await interaction.followup.send(content, ephemeral=True)
+            else:
+                message = await interaction.followup.send(content, wait=True)
     except discord.errors.HTTPException:
         # Interaction expired (15 minutes): answer in the channel instead
         await send_by_channel(interaction.channel, content)
@@ -94,7 +92,7 @@ async def reply(
             await message.delete(delay=delay)  # Scheduled, doesn't wait
 
 
-async def finish_interaction(interaction: discord.Interaction) -> None:
+async def finish_interaction(interaction: discord.Interaction[MyClient]) -> None:
     """Remove the "thinking..." message of a command that didn't answer."""
     if not _waits_for_reply(interaction):
         return
@@ -124,7 +122,10 @@ async def edit_message(
             attachments=[file] if file else discord.utils.MISSING,
         )
     except discord.errors.HTTPException:
-        return await send_by_channel(message.channel, content, view=view, embed=embed)
+        # None removes the embed of the edited message: nothing to send
+        return await send_by_channel(
+            message.channel, content, view=view, embed=embed or discord.utils.MISSING
+        )
 
 
 async def delete_msg(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 import discord
 
@@ -12,6 +12,13 @@ if TYPE_CHECKING:
 
 
 ASSETS_FOLDER: Path = BASE_DIR / "assets"
+
+
+class FFmpegOptions(TypedDict, total=False):
+    """Keyword arguments of discord.FFmpegPCMAudio."""
+
+    before_options: str
+    options: str
 
 
 class MusicSource(ABC):
@@ -54,7 +61,7 @@ class MusicSource(ABC):
         pass
 
     @abstractmethod
-    async def get_stream_url(self, track: Track) -> tuple[str | None, dict[str, str]]:
+    async def get_stream_url(self, track: Track) -> tuple[str | None, FFmpegOptions]:
         pass
 
     def create_embed(

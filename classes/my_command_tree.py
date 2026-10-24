@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import discord
 from discord import app_commands
@@ -12,7 +12,10 @@ if TYPE_CHECKING:
 
 
 class MyCommandTree(app_commands.CommandTree["MyClient"]):
-    async def interaction_check(self, interaction: discord.Interaction, /) -> bool:
+    @override
+    async def interaction_check(
+        self, interaction: discord.Interaction[MyClient], /
+    ) -> bool:
         """Called before every slash command: returning False cancels it."""
         if interaction.user.id in self.client.blacklist:
             await my_functions.reply(interaction, MSG_BLACKLIST, private=True)
@@ -23,8 +26,12 @@ class MyCommandTree(app_commands.CommandTree["MyClient"]):
         await interaction.response.defer(thinking=True)
         return True
 
+    @override
     async def on_error(
-        self, interaction: discord.Interaction, error: app_commands.AppCommandError, /
+        self,
+        interaction: discord.Interaction[MyClient],
+        error: app_commands.AppCommandError,
+        /,
     ) -> None:
         await super().on_error(interaction, error)  # Logs the error
         # Otherwise "thinking..." stays forever

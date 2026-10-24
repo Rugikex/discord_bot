@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 if TYPE_CHECKING:
     from discord import User, Member
@@ -21,6 +21,7 @@ class Track:
         self._origin: str = origin
         self._requester: User | Member = requester
 
+    @override
     def __str__(self) -> str:
         return f"{self._title} ({self._duration})"
 

@@ -2,13 +2,13 @@ from __future__ import annotations
 import asyncio
 import datetime
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from discord import Color
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 
-from .base import MusicSource
+from .base import FFmpegOptions, MusicSource
 from classes.track import Track
 from constants import MAX_SEARCH_RESULTS
 from logger_setup import YDLLogger, my_logger
@@ -26,7 +26,7 @@ YDL_STREAM_OPTIONS: dict[str, Any] = {
     "ignoreerrors": True,
 }
 
-FFMPEG_OPTIONS: dict[str, str] = {
+FFMPEG_OPTIONS: FFmpegOptions = {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 3",
     "options": "-vn -loglevel quiet",
 }
@@ -96,21 +96,25 @@ class YoutubeSource(MusicSource):
     color: Color = Color.red()
     logo: str = "youtube-logo.png"
 
+    @override
     def get_url(self, track: Track) -> str | None:
         return track.link
 
+    @override
     async def get_track(
         self, link: str, requester: discord.User | discord.Member
     ) -> Track | None:
         tracks: list[Track] = await self._single_link(link, requester)
         return tracks[0] if tracks else None
 
+    @override
     def is_link(self, query: str) -> bool:
         return (
             YOUTUBE_PLAYLIST_REGEX.search(query) is not None
             or YOUTUBE_VIDEO_REGEX.search(query) is not None
         )
 
+    @override
     async def load(
         self, link: str, requester: discord.User | discord.Member
     ) -> list[Track]:
@@ -128,6 +132,7 @@ class YoutubeSource(MusicSource):
         video_id: str = match[4] if match[4] is not None else match[7]
         return await self._single_link(f"https://youtu.be/{video_id}", requester)
 
+    @override
     async def search(
         self, query: str, requester: discord.User | discord.Member
     ) -> list[Track]:
@@ -136,7 +141,8 @@ class YoutubeSource(MusicSource):
         )
         return _entries_to_tracks(info, requester)
 
-    async def get_stream_url(self, track: Track) -> tuple[str | None, dict[str, str]]:
+    @override
+    async def get_stream_url(self, track: Track) -> tuple[str | None, FFmpegOptions]:
         info: dict[str, Any] | None = await asyncio.to_thread(
             _extract_stream, track.link
         )

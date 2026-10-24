@@ -16,22 +16,30 @@ from logger_setup import my_logger
 import my_functions
 
 if TYPE_CHECKING:
+    from classes.current_track import CurrentTrack
     from classes.music_source import MusicSource
+    from classes.music_source.base import FFmpegOptions
     from classes.my_client import MyClient
     from classes.guild_player import GuildPlayer
     from classes.track_queue import TrackQueue
 
 
-async def user_is_connected(interaction: discord.Interaction) -> bool:
-    if isinstance(interaction.user, discord.User) or interaction.user.voice is None:
+async def get_user_voice_channel(
+    interaction: discord.Interaction[MyClient],
+) -> discord.VoiceChannel | discord.StageChannel | None:
+    """Voice channel of the user, None (with an error message) if there is none."""
+    voice: discord.VoiceState | None = (
+        interaction.user.voice if isinstance(interaction.user, discord.Member) else None
+    )
+    if voice is None or voice.channel is None:
         await my_functions.reply(
             interaction,
             "You have to be connected to a voice channel in this server!",
             private=True,
         )
-        return False
+        return None
 
-    return True
+    return voice.channel
 
 
 def _log_future_error(future: concurrent.futures.Future) -> None:
@@ -40,13 +48,13 @@ def _log_future_error(future: concurrent.futures.Future) -> None:
 
 
 def _after_track(
-    error: Exception | None, interaction: discord.Interaction[MyClient], guild_id: int
+    error: Exception | None, interaction: discord.Interaction[MyClient]
 ) -> None:
     """Called by discord.py from the audio thread when a track ends."""
     if error is not None:
         my_logger.error("Player error: %s", error)
     future: concurrent.futures.Future = asyncio.run_coroutine_threadsafe(
-        next_track(interaction, guild_id), interaction.client.loop
+        next_track(interaction), interaction.client.loop
     )
     future.add_done_callback(_log_future_error)
 
@@ -56,7 +64,8 @@ async def get_welcome_track(
 ) -> Track | None:
     """Build the welcome track from the guild settings, only once per connection."""
     settings: dict[str, str | None] | None = player.pop_welcome_track()
-    if not settings or not settings.get("link"):
+    link: str | None = settings.get("link") if settings else None
+    if not settings or not link:
         return None
 
     music_source: MusicSource | None = MUSIC_SOURCES.get(
@@ -64,19 +73,19 @@ async def get_welcome_track(
     )
     if music_source is None:
         return None
-    return await music_source.get_track(settings["link"], requester)
+    return await music_source.get_track(link, requester)
 
 
-async def next_track(interaction: discord.Interaction[MyClient], guild_id: int) -> None:
+async def next_track(interaction: discord.Interaction[MyClient]) -> None:
     """Play the next track if nothing is playing (or paused)."""
-    player: GuildPlayer | None = interaction.client.find_player(guild_id)
+    player: GuildPlayer | None = interaction.client.find_player(interaction.guild_id)
     if player is None:
         return
 
     async with player.play_lock:
         while True:
             voice_client: discord.VoiceClient | None = (
-                interaction.guild.voice_client if interaction.guild else None
+                my_functions.get_guild_voice_client(interaction.guild)
             )
             if voice_client is None or player.is_disconnected:
                 return
@@ -88,11 +97,14 @@ async def next_track(interaction: discord.Interaction[MyClient], guild_id: int) 
             welcome_track: Track | None = await get_welcome_track(
                 player, interaction.user
             )
-            is_replay: bool = player.is_looping and player.current_track is not None
+            replayed: CurrentTrack | None = (
+                player.current_track if player.is_looping else None
+            )
+            is_replay: bool = replayed is not None
             if welcome_track is not None:
                 new_track = welcome_track
-            elif is_replay:
-                new_track = player.current_track.track
+            elif replayed is not None:
+                new_track = replayed.track
             elif track_queue.has_next_track():
                 new_track = track_queue.next_track
             else:
@@ -100,7 +112,7 @@ async def next_track(interaction: discord.Interaction[MyClient], guild_id: int) 
                 return
 
             url: str | None
-            ffmpeg_options: dict[str, str]
+            ffmpeg_options: FFmpegOptions
             url, ffmpeg_options = await MUSIC_SOURCES[new_track.origin].get_stream_url(
                 new_track
             )
@@ -126,19 +138,22 @@ async def next_track(interaction: discord.Interaction[MyClient], guild_id: int) 
 
             voice_client.play(
                 audio,
-                after=lambda error: _after_track(error, interaction, guild_id),
+                after=lambda error: _after_track(error, interaction),
             )
             return
 
 
 async def get_voice_client(
-    interaction: discord.Interaction, check: bool = True
+    interaction: discord.Interaction[MyClient], check: bool = True
 ) -> discord.VoiceClient | None:
-    if check and not await user_is_connected(interaction):
-        return None
+    user_channel: discord.VoiceChannel | discord.StageChannel | None = None
+    if check:
+        user_channel = await get_user_voice_channel(interaction)
+        if user_channel is None:
+            return None
 
-    voice_client: discord.VoiceClient | None = (
-        interaction.guild.voice_client if interaction.guild else None
+    voice_client: discord.VoiceClient | None = my_functions.get_guild_voice_client(
+        interaction.guild
     )
     if voice_client is None:
         await my_functions.reply(
@@ -146,7 +161,7 @@ async def get_voice_client(
         )
         return None
 
-    if check and interaction.user.voice.channel != voice_client.channel:
+    if user_channel is not None and user_channel != voice_client.channel:
         await my_functions.reply(
             interaction, "We are in different voice channels.", private=True
         )
@@ -156,7 +171,7 @@ async def get_voice_client(
 
 
 async def check_voice_client(
-    interaction: discord.Interaction,
+    interaction: discord.Interaction[MyClient],
 ) -> discord.VoiceClient | None:
     voice_client: discord.VoiceClient | None = await get_voice_client(interaction)
     if voice_client is None:
@@ -169,11 +184,11 @@ async def check_voice_client(
     return voice_client
 
 
-async def client_is_disconnected(interaction: discord.Interaction) -> bool:
+async def client_is_disconnected(interaction: discord.Interaction[MyClient]) -> bool:
     return interaction.guild is None or interaction.guild.voice_client is None
 
 
-async def pause_track(interaction: discord.Interaction) -> None:
+async def pause_track(interaction: discord.Interaction[MyClient]) -> None:
     voice_client: discord.VoiceClient | None = await check_voice_client(interaction)
     if voice_client is None:
         return
@@ -189,7 +204,7 @@ async def pause_track(interaction: discord.Interaction) -> None:
     await my_functions.reply(interaction, "The track is paused.")
 
 
-async def resume_track(interaction: discord.Interaction) -> None:
+async def resume_track(interaction: discord.Interaction[MyClient]) -> None:
     voice_client: discord.VoiceClient | None = await check_voice_client(interaction)
     if voice_client is None:
         return
@@ -243,16 +258,19 @@ async def disconnect(interaction: discord.Interaction[MyClient]) -> None:
 
 
 async def is_connected(
-    interaction: discord.Interaction[MyClient], channel: discord.VoiceChannel
+    interaction: discord.Interaction[MyClient],
+    channel: discord.VoiceChannel | discord.StageChannel,
 ) -> bool:
-    current_voice_client: discord.VoiceClient | None = interaction.guild.voice_client
+    current_voice_client: discord.VoiceClient | None = (
+        my_functions.get_guild_voice_client(interaction.guild)
+    )
     if current_voice_client is not None and current_voice_client.channel == channel:
         if not interaction.client.player_exists(interaction.guild_id):
             interaction.client.add_player(interaction.guild_id)
         return True
     try:
         await channel.connect(timeout=15.0, self_deaf=True)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         await my_functions.reply(
             interaction, "I can't connect to this channel!", private=True
         )
@@ -269,7 +287,7 @@ async def is_connected(
         return False
 
     interaction.client.add_player(interaction.guild_id)
-    my_logger.info("Bot connects to %s.", interaction.guild.name)
+    my_logger.info("Bot connects to %s.", channel.guild.name)
     return True
 
 
@@ -306,7 +324,7 @@ async def select_specific_search(
         interaction, [track], position, search_results.query, shuffle_queue
     )
 
-    await next_track(interaction, interaction.guild_id)
+    await next_track(interaction)
     return True
 
 
@@ -314,10 +332,13 @@ async def join_user_channel(
     interaction: discord.Interaction[MyClient],
 ) -> GuildPlayer | None:
     """Connect the bot to the voice channel of the user, None if it can't."""
-    if not await user_is_connected(interaction):
+    user_channel: discord.VoiceChannel | discord.StageChannel | None = (
+        await get_user_voice_channel(interaction)
+    )
+    if user_channel is None:
         return None
 
-    if not await is_connected(interaction, interaction.user.voice.channel):
+    if not await is_connected(interaction, user_channel):
         return None
 
     voice_client: discord.VoiceClient | None = await get_voice_client(interaction)
@@ -350,7 +371,7 @@ async def add_tracks(
         interaction, tracks, position, content, shuffle_queue
     )
 
-    await next_track(interaction, interaction.guild_id)
+    await next_track(interaction)
 
 
 async def show_search(

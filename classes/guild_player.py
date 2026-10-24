@@ -10,6 +10,7 @@ from classes.track_queue import TrackQueue
 import my_functions
 
 if TYPE_CHECKING:
+    from classes.my_client import MyClient
     from classes.audio_source_tracked import AudioSourceTracked
     from classes.search_results import SearchResults
     from classes.track import Track
@@ -60,7 +61,7 @@ class GuildPlayer:
 
     async def update_current_track(
         self,
-        interaction: discord.Interaction,
+        interaction: discord.Interaction[MyClient],
         track: Track,
         audio: AudioSourceTracked,
     ) -> None:
@@ -84,7 +85,7 @@ class GuildPlayer:
 
         last_message: discord.Message | None = None
         try:
-            if hasattr(interaction.channel, "history"):
+            if isinstance(interaction.channel, discord.abc.Messageable):
                 async for message in interaction.channel.history(limit=1):
                     last_message = message
         except discord.errors.HTTPException:

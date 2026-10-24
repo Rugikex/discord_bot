@@ -35,7 +35,7 @@ def add_commands(tree: app_commands.CommandTree) -> None:
             tree.add_command(value)
 
 
-async def msg_help(interaction: discord.Interaction) -> None:
+async def msg_help(interaction: discord.Interaction[MyClient]) -> None:
     content: str = (
         "`add_local_tracks (shuffle) (position)`: Add all local files in the queue.\n"
         "`clear`: Clear the queue.\n"
@@ -72,7 +72,7 @@ async def get_connected_player(
     return player
 
 
-async def display_current_track(interaction: discord.Interaction) -> None:
+async def display_current_track(interaction: discord.Interaction[MyClient]) -> None:
     player: GuildPlayer | None = await get_connected_player(interaction)
     if player is None:
         return
@@ -98,14 +98,16 @@ async def display_current_track(interaction: discord.Interaction) -> None:
 )
 @app_commands.guild_only()
 async def cmd_add_local_tracks(
-    interaction: discord.Interaction, shuffle: bool = False, position: int | None = None
+    interaction: discord.Interaction[MyClient],
+    shuffle: bool = False,
+    position: int | None = None,
 ) -> None:
     await voice_gestion.play_local(interaction, shuffle=shuffle, position=position)
 
 
 @app_commands.command(name="clear", description="Clear the queue.")
 @app_commands.guild_only()
-async def cmd_clear(interaction: discord.Interaction) -> None:
+async def cmd_clear(interaction: discord.Interaction[MyClient]) -> None:
     player: GuildPlayer | None = await get_connected_player(interaction)
     if player is None:
         return
@@ -116,19 +118,19 @@ async def cmd_clear(interaction: discord.Interaction) -> None:
 
 @app_commands.command(name="disconnect", description="Disconnect the bot.")
 @app_commands.guild_only()
-async def cmd_disconnect(interaction: discord.Interaction) -> None:
+async def cmd_disconnect(interaction: discord.Interaction[MyClient]) -> None:
     await voice_gestion.disconnect(interaction)
 
 
 @app_commands.command(name="help", description="Display commands.")
 @app_commands.guild_only()
-async def cmd_help(interaction: discord.Interaction) -> None:
+async def cmd_help(interaction: discord.Interaction[MyClient]) -> None:
     await msg_help(interaction)
 
 
 @app_commands.command(name="loop", description="Loop or unloop the current track.")
 @app_commands.guild_only()
-async def cmd_loop(interaction: discord.Interaction) -> None:
+async def cmd_loop(interaction: discord.Interaction[MyClient]) -> None:
     player: GuildPlayer | None = await get_connected_player(interaction)
     if player is None:
         return
@@ -160,7 +162,7 @@ async def cmd_loop(interaction: discord.Interaction) -> None:
 )
 @app_commands.guild_only()
 async def cmd_move(
-    interaction: discord.Interaction, position: int, new_position: int
+    interaction: discord.Interaction[MyClient], position: int, new_position: int
 ) -> None:
     player: GuildPlayer | None = await get_connected_player(interaction)
     if player is None:
@@ -171,13 +173,13 @@ async def cmd_move(
 
 @app_commands.command(name="nowplaying", description="Display the current track.")
 @app_commands.guild_only()
-async def cmd_nowplaying(interaction: discord.Interaction) -> None:
+async def cmd_nowplaying(interaction: discord.Interaction[MyClient]) -> None:
     await display_current_track(interaction)
 
 
 @app_commands.command(name="pause", description="Pause the current track.")
 @app_commands.guild_only()
-async def cmd_pause(interaction: discord.Interaction) -> None:
+async def cmd_pause(interaction: discord.Interaction[MyClient]) -> None:
     await voice_gestion.pause_track(interaction)
 
 
@@ -185,7 +187,7 @@ async def cmd_pause(interaction: discord.Interaction) -> None:
 @app_commands.choices(platform=PLATFORM_CHOICES)
 @app_commands.guild_only()
 async def cmd_play(
-    interaction: discord.Interaction,
+    interaction: discord.Interaction[MyClient],
     track: str,
     platform: app_commands.Choice[str] | None = None,
     position: int | None = None,
@@ -206,7 +208,8 @@ async def cmd_play_default(
     default_tracks: dict[str, str | None] = interaction.client.load_settings(
         interaction.guild_id
     )["default_tracks"]
-    if not default_tracks.get("link"):
+    link: str | None = default_tracks.get("link")
+    if not link:
         await my_functions.reply(
             interaction, "No default track for this server", private=True
         )
@@ -214,7 +217,7 @@ async def cmd_play_default(
 
     await voice_gestion.play(
         interaction,
-        default_tracks["link"],
+        link,
         default_tracks.get("platform"),
         shuffle=shuffle,
         position=position,
@@ -228,7 +231,7 @@ async def cmd_play_default(
 @app_commands.choices(platform=PLATFORM_CHOICES)
 @app_commands.guild_only()
 async def cmd_play_next(
-    interaction: discord.Interaction,
+    interaction: discord.Interaction[MyClient],
     track: str,
     platform: app_commands.Choice[str] | None = None,
     shuffle: bool = False,
@@ -240,7 +243,7 @@ async def cmd_play_next(
 @app_commands.choices(platform=PLATFORM_CHOICES)
 @app_commands.guild_only()
 async def cmd_play_shuffle(
-    interaction: discord.Interaction,
+    interaction: discord.Interaction[MyClient],
     track: str,
     platform: app_commands.Choice[str] | None = None,
 ) -> None:
@@ -249,7 +252,7 @@ async def cmd_play_shuffle(
 
 @app_commands.command(name="queue", description="Display the queue.")
 @app_commands.guild_only()
-async def cmd_queue(interaction: discord.Interaction, page: int = 1) -> None:
+async def cmd_queue(interaction: discord.Interaction[MyClient], page: int = 1) -> None:
     player: GuildPlayer | None = await get_connected_player(interaction)
     if player is None:
         return
@@ -262,7 +265,7 @@ async def cmd_queue(interaction: discord.Interaction, page: int = 1) -> None:
 )
 @app_commands.guild_only()
 async def cmd_remove(
-    interaction: discord.Interaction, begin: int, end: int | None = None
+    interaction: discord.Interaction[MyClient], begin: int, end: int | None = None
 ) -> None:
     if begin < 1 or (end is not None and end < 1) or (end is not None and end < begin):
         await my_functions.reply(interaction, "Number is incorrect!", private=True)
@@ -281,13 +284,13 @@ async def cmd_remove(
 
 @app_commands.command(name="resume", description="Resume the current track.")
 @app_commands.guild_only()
-async def cmd_resume(interaction: discord.Interaction) -> None:
+async def cmd_resume(interaction: discord.Interaction[MyClient]) -> None:
     await voice_gestion.resume_track(interaction)
 
 
 @app_commands.command(name="shuffle", description="Shuffle tracks.")
 @app_commands.guild_only()
-async def cmd_shuffle(interaction: discord.Interaction) -> None:
+async def cmd_shuffle(interaction: discord.Interaction[MyClient]) -> None:
     player: GuildPlayer | None = await get_connected_player(interaction)
     if player is None:
         return
@@ -300,7 +303,7 @@ async def cmd_shuffle(interaction: discord.Interaction) -> None:
     name="skip", description="Skip the current track or first 'number' tracks."
 )
 @app_commands.guild_only()
-async def cmd_skip(interaction: discord.Interaction, number: int = 1) -> None:
+async def cmd_skip(interaction: discord.Interaction[MyClient], number: int = 1) -> None:
     if number < 1:
         await my_functions.reply(interaction, "Numbers are incorrect!", private=True)
         return
@@ -310,7 +313,7 @@ async def cmd_skip(interaction: discord.Interaction, number: int = 1) -> None:
 
 @app_commands.command(name="stop", description="Stop track.")
 @app_commands.guild_only()
-async def cmd_stop(interaction: discord.Interaction) -> None:
+async def cmd_stop(interaction: discord.Interaction[MyClient]) -> None:
     player: GuildPlayer | None = await get_connected_player(interaction)
     if player is None:
         return
