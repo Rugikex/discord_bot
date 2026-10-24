@@ -66,7 +66,7 @@ class TrackQueue:
         self, interaction: discord.Interaction, position: int, new_position: int
     ) -> None:
         if not self._tracks:
-            await my_functions.send_by_channel(interaction.channel, "Queue is empty!")
+            await my_functions.reply(interaction, "Queue is empty!", private=True)
             return
 
         if (
@@ -75,16 +75,16 @@ class TrackQueue:
             or position > len(self._tracks)
             or new_position > len(self._tracks)
         ):
-            await my_functions.send_by_channel(
-                interaction.channel, "Numbers are incorrect!"
+            await my_functions.reply(
+                interaction, "Numbers are incorrect!", private=True
             )
             return
 
         track: Track = self._tracks.pop(position - 1)
         self._tracks.insert(new_position - 1, track)
 
-        await my_functions.send_by_channel(
-            interaction.channel,
+        await my_functions.reply(
+            interaction,
             f"Move {track} from position {position} to position {new_position}.",
         )
 
@@ -110,9 +110,7 @@ class TrackQueue:
                 break
 
         if send_msg:
-            await my_functions.send_by_channel(
-                interaction.channel, f"Remove {counter} track(s)."
-            )
+            await my_functions.reply(interaction, f"Remove {counter} track(s).")
 
     async def get_queue(
         self, interaction: discord.Interaction, page: int, is_new: bool = True
@@ -124,18 +122,18 @@ class TrackQueue:
             return
 
         if len(self._tracks) == 0:
-            await my_functions.send_by_channel(interaction.channel, "Queue is empty!")
+            await my_functions.reply(interaction, "Queue is empty!", private=True)
             return
 
         if page <= 0:
-            await my_functions.send_by_channel(
-                interaction.channel, "Number page is incorrect!"
+            await my_functions.reply(
+                interaction, "Number page is incorrect!", private=True
             )
             return
 
         if page != 1 and not self._tracks[(page - 1) * 10 : page * 10]:
-            await my_functions.send_by_channel(
-                interaction.channel, "Number page is too big!"
+            await my_functions.reply(
+                interaction, "Number page is too big!", private=True
             )
             return
 
@@ -148,7 +146,7 @@ class TrackQueue:
             await my_functions.edit_message(self._message, content=content)
             await self.edit_buttons_on_message_queue(self._message, page)
         else:
-            self._message: discord.Message = await my_functions.send_by_channel(
+            self._message = await my_functions.send_by_channel(
                 interaction.channel, content
             )
             if self._message:
@@ -168,28 +166,28 @@ class TrackQueue:
             for i, track in enumerate(tracks):
                 self._tracks.insert(position - 1 + i, track)
             if len(tracks) > 1:
-                await my_functions.send_by_channel(
-                    interaction.channel,
+                await my_functions.reply(
+                    interaction,
                     f"Added {len(tracks)} tracks to {position} at "
                     f"{position + len(tracks)} in queue.\n"
                     f'From: "{content}".',
                 )
             else:
-                await my_functions.send_by_channel(
-                    interaction.channel,
+                await my_functions.reply(
+                    interaction,
                     f'Added in position {position} to queue: "{tracks[0]}".\n'
                     f'From: "{content}".',
                 )
         else:
             self._tracks.extend(tracks)
             if len(tracks) > 1:
-                await my_functions.send_by_channel(
-                    interaction.channel,
+                await my_functions.reply(
+                    interaction,
                     f"Added {len(tracks)} tracks to queue.\n" f'From: "{content}".',
                 )
             else:
-                await my_functions.send_by_channel(
-                    interaction.channel,
+                await my_functions.reply(
+                    interaction,
                     f'Added to queue: "{tracks[0]}".\n' f'From: "{content}".',
                 )
 
@@ -288,6 +286,4 @@ class TrackQueue:
             player.stop_looping()
 
         voice_client.stop()
-        await my_functions.send_by_channel(
-            interaction.channel, "The bot stops playing tracks."
-        )
+        await my_functions.reply(interaction, "The bot stops playing tracks.")

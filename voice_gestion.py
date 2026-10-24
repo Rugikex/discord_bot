@@ -23,9 +23,10 @@ if TYPE_CHECKING:
 
 async def user_is_connected(interaction: discord.Interaction) -> bool:
     if isinstance(interaction.user, discord.User) or interaction.user.voice is None:
-        await my_functions.send_by_channel(
-            interaction.channel,
+        await my_functions.reply(
+            interaction,
             "You have to be connected to a voice channel in this server!",
+            private=True,
         )
         return False
 
@@ -139,14 +140,14 @@ async def get_voice_client(
         interaction.guild.voice_client if interaction.guild else None
     )
     if voice_client is None:
-        await my_functions.send_by_channel(
-            interaction.channel, "I'm not connected to this server."
+        await my_functions.reply(
+            interaction, "I'm not connected to this server.", private=True
         )
         return None
 
     if check and interaction.user.voice.channel != voice_client.channel:
-        await my_functions.send_by_channel(
-            interaction.channel, "We are in different voice channels."
+        await my_functions.reply(
+            interaction, "We are in different voice channels.", private=True
         )
         return None
 
@@ -161,7 +162,7 @@ async def check_voice_client(
         return None
 
     if voice_client.source is None:
-        await my_functions.send_by_channel(interaction.channel, "No track is playing.")
+        await my_functions.reply(interaction, "No track is playing.", private=True)
         return None
 
     return voice_client
@@ -177,14 +178,14 @@ async def pause_track(interaction: discord.Interaction) -> None:
         return
 
     if voice_client.is_paused():
-        await my_functions.send_by_channel(
-            interaction.channel, "The track is already paused."
+        await my_functions.reply(
+            interaction, "The track is already paused.", private=True
         )
         return
 
     voice_client.pause()
 
-    await my_functions.send_by_channel(interaction.channel, "The track is paused.")
+    await my_functions.reply(interaction, "The track is paused.")
 
 
 async def resume_track(interaction: discord.Interaction) -> None:
@@ -193,14 +194,14 @@ async def resume_track(interaction: discord.Interaction) -> None:
         return
 
     if not voice_client.is_paused():
-        await my_functions.send_by_channel(
-            interaction.channel, "The track is already playing."
+        await my_functions.reply(
+            interaction, "The track is already playing.", private=True
         )
         return
 
     voice_client.resume()
 
-    await my_functions.send_by_channel(interaction.channel, "The track resumes.")
+    await my_functions.reply(interaction, "The track resumes.")
 
 
 async def skip_track(interaction: discord.Interaction[MyClient], number: int) -> None:
@@ -228,9 +229,7 @@ async def skip_track(interaction: discord.Interaction[MyClient], number: int) ->
     voice_client.stop()
 
     if track_to_skip:
-        await my_functions.send_by_channel(
-            interaction.channel, f"Skip {track_to_skip}."
-        )
+        await my_functions.reply(interaction, f"Skip {track_to_skip}.")
 
 
 async def disconnect(interaction: discord.Interaction[MyClient]) -> None:
@@ -239,7 +238,7 @@ async def disconnect(interaction: discord.Interaction[MyClient]) -> None:
         return
 
     await interaction.client.disconnect_bot(voice_client, interaction.guild_id)
-    await my_functions.send_by_channel(interaction.channel, "The bot is disconnected.")
+    await my_functions.reply(interaction, "The bot is disconnected.")
 
 
 async def is_connected(
@@ -253,8 +252,8 @@ async def is_connected(
     try:
         await channel.connect(timeout=15.0, self_deaf=True)
     except asyncio.TimeoutError:
-        await my_functions.send_by_channel(
-            interaction.channel, "I can't connect to this channel!"
+        await my_functions.reply(
+            interaction, "I can't connect to this channel!", private=True
         )
         return False
     except discord.errors.ClientException:
@@ -263,9 +262,8 @@ async def is_connected(
             if current_voice_client is not None
             else "another channel"
         )
-        await my_functions.send_by_channel(
-            interaction.channel,
-            f"Already connected to {channel_name}.",
+        await my_functions.reply(
+            interaction, f"Already connected to {channel_name}.", private=True
         )
         return False
 
@@ -326,9 +324,7 @@ async def play(
 
     voice_client: discord.VoiceClient | None = await get_voice_client(interaction)
     if voice_client is None:
-        await my_functions.send_by_channel(
-            interaction.channel, "I have been disconnected."
-        )
+        await my_functions.reply(interaction, "I have been disconnected.", private=True)
         return
 
     player: GuildPlayer = interaction.client.get_player(interaction.guild_id)
@@ -343,8 +339,8 @@ async def play(
         platform = raw_platform.value
 
     if platform not in MUSIC_SOURCES:
-        await my_functions.send_by_channel(
-            interaction.channel, f'Unknown platform "{platform}".'
+        await my_functions.reply(
+            interaction, f'Unknown platform "{platform}".', private=True
         )
         return
 
@@ -384,9 +380,7 @@ async def play_local(
 
     voice_client: discord.VoiceClient | None = await get_voice_client(interaction)
     if voice_client is None:
-        await my_functions.send_by_channel(
-            interaction.channel, "I have been disconnected."
-        )
+        await my_functions.reply(interaction, "I have been disconnected.", private=True)
         return
 
     player: GuildPlayer = interaction.client.get_player(interaction.guild_id)

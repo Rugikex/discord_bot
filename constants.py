@@ -22,4 +22,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "link": "https://www.youtube.com/watch?v=hSU0Z3_466s",
         "platform": "youtube",
     },
+    # Seconds before public answers to commands are deleted (0 to keep them)
+    "delete_replies_after": 60,
 }
+# Interactions expire after 15 minutes: a later deletion would fail
+MAX_DELETE_REPLIES_AFTER: int = 600

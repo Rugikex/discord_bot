@@ -1,7 +1,13 @@
 from __future__ import annotations
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
 import discord
+
+if TYPE_CHECKING:
+    from classes.my_client import MyClient
+
+# Stored in Interaction.extras once the "thinking..." message is used
+REPLIED_KEY: str = "replied"
 
 InteractionChannel = Union[
     discord.VoiceChannel,
@@ -13,15 +19,6 @@ InteractionChannel = Union[
     discord.DMChannel,
     discord.GroupChannel,
 ]
-
-
-async def get_response(
-    interaction: discord.Interaction,
-) -> discord.InteractionResponse | discord.Message:
-    try:
-        return await interaction.original_response()
-    except discord.errors.NotFound:
-        return interaction.response
 
 
 async def send_by_channel(
@@ -47,40 +44,65 @@ async def send_by_channel(
         return None
 
 
-async def send_by_interaction(
-    interaction: discord.Interaction,
-    content: str,
-    delete_after: float | None = None,
-    view: discord.ui.View = discord.utils.MISSING,
+def _waits_for_reply(interaction: discord.Interaction) -> bool:
+    """True while the "thinking..." message of a slash command is displayed."""
+    return (
+        interaction.type is discord.InteractionType.application_command
+        and interaction.response.is_done()
+        and not interaction.extras.get(REPLIED_KEY, False)
+    )
+
+
+async def reply(
+    interaction: discord.Interaction[MyClient], content: str, private: bool = False
 ) -> None:
-    try:
-        await interaction.response.send_message(
-            content, delete_after=delete_after, view=view, ephemeral=True
-        )
-    except discord.errors.InteractionResponded:
-        await edit_interaction(interaction, content=content, view=view)
-    except discord.errors.HTTPException:
-        await send_by_channel(interaction.channel, content, view=view)
+    """Answer an interaction, visible only by its author if private.
 
-
-async def edit_interaction(
-    interaction: discord.Interaction,
-    content: str = discord.utils.MISSING,
-    view: discord.ui.View = discord.utils.MISSING,
-):
+    The first public answer to a slash command replaces its "thinking..."
+    message. Public answers are deleted after the guild "delete_replies_after"
+    setting (0 to keep them).
+    """
+    message: discord.InteractionMessage | discord.WebhookMessage | None = None
     try:
-        response: discord.InteractionResponse | discord.Message = await get_response(
-            interaction
-        )
-        if isinstance(response, discord.InteractionResponse):
-            if response.type is None:
-                await send_by_channel(interaction.channel, content, view=view)
+        if not interaction.response.is_done():
+            await interaction.response.send_message(content, ephemeral=private)
+            if not private:
+                message = await interaction.original_response()
+        elif _waits_for_reply(interaction):
+            interaction.extras[REPLIED_KEY] = True
+            if private:
+                # The "thinking..." message is public: replace it by a private one
+                await interaction.delete_original_response()
+                await interaction.followup.send(content, ephemeral=True)
             else:
-                await response.edit_message(content=content, view=view)
+                message = await interaction.edit_original_response(content=content)
         else:
-            await response.edit(content=content, view=view)
-    except (discord.errors.HTTPException, discord.errors.InteractionResponded):
-        await send_by_channel(interaction.channel, content, view=view)
+            # Button click or second answer
+            message = await interaction.followup.send(
+                content, ephemeral=private, wait=not private
+            )
+    except discord.errors.HTTPException:
+        # Interaction expired (15 minutes): answer in the channel instead
+        await send_by_channel(interaction.channel, content)
+        return
+
+    if message is not None and interaction.guild_id is not None:
+        delay: int = interaction.client.load_settings(interaction.guild_id)[
+            "delete_replies_after"
+        ]
+        if delay > 0:
+            await message.delete(delay=delay)  # Scheduled, doesn't wait
+
+
+async def finish_interaction(interaction: discord.Interaction) -> None:
+    """Remove the "thinking..." message of a command that didn't answer."""
+    if not _waits_for_reply(interaction):
+        return
+    interaction.extras[REPLIED_KEY] = True
+    try:
+        await interaction.delete_original_response()
+    except discord.errors.HTTPException:
+        pass
 
 
 async def edit_message(

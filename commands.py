@@ -5,6 +5,7 @@ import discord
 from discord import app_commands
 
 from classes.music_source import MUSIC_SOURCES
+from constants import MAX_DELETE_REPLIES_AFTER
 import my_functions
 import voice_gestion
 
@@ -57,7 +58,7 @@ async def msg_help(interaction: discord.Interaction) -> None:
         "`stop`: Stop current track.\n"
     )
 
-    await my_functions.send_by_channel(interaction.channel, content)
+    await my_functions.reply(interaction, content)
 
 
 async def get_connected_player(
@@ -65,8 +66,8 @@ async def get_connected_player(
 ) -> GuildPlayer | None:
     player: GuildPlayer | None = interaction.client.find_player(interaction.guild_id)
     if player is None:
-        await my_functions.send_by_channel(
-            interaction.channel, "I'm not connected to this server."
+        await my_functions.reply(
+            interaction, "I'm not connected to this server.", private=True
         )
     return player
 
@@ -76,7 +77,7 @@ async def display_current_track(interaction: discord.Interaction) -> None:
     if player is None:
         return
     if player.current_track is None:
-        await my_functions.send_by_channel(interaction.channel, "No track.")
+        await my_functions.reply(interaction, "No track.", private=True)
         return
 
     current_track: CurrentTrack = player.current_track
@@ -86,10 +87,10 @@ async def display_current_track(interaction: discord.Interaction) -> None:
         f" / {current_track.track.duration}]"
     )
 
-    await my_functions.send_by_channel(interaction.channel, msg_content)
+    await my_functions.reply(interaction, msg_content)
 
 
-# The blacklist and "Request received" are handled by MyCommandTree.interaction_check
+# The blacklist and the "thinking..." message are handled by MyCommandTree
 
 
 @app_commands.command(
@@ -110,7 +111,7 @@ async def cmd_clear(interaction: discord.Interaction) -> None:
         return
     track_queue: TrackQueue = player.track_queue
     if await track_queue.clear_queue(interaction):
-        await my_functions.send_by_channel(interaction.channel, "The queue is cleared.")
+        await my_functions.reply(interaction, "The queue is cleared.")
 
 
 @app_commands.command(name="disconnect", description="Disconnect the bot.")
@@ -132,9 +133,8 @@ async def cmd_loop(interaction: discord.Interaction) -> None:
     if player is None:
         return
     player.switch_looping(interaction.user.mention)
-    await my_functions.send_by_channel(
-        interaction.channel,
-        f"Looping is {'enabled' if player.is_looping else 'disabled'}.",
+    await my_functions.reply(
+        interaction, f"Looping is {'enabled' if player.is_looping else 'disabled'}."
     )
 
     if player.current_track is not None:
@@ -207,8 +207,8 @@ async def cmd_play_default(
         interaction.guild_id
     )["default_tracks"]
     if not default_tracks.get("link"):
-        await my_functions.send_by_channel(
-            interaction.channel, "No default track for this server"
+        await my_functions.reply(
+            interaction, "No default track for this server", private=True
         )
         return
 
@@ -265,7 +265,7 @@ async def cmd_remove(
     interaction: discord.Interaction, begin: int, end: int | None = None
 ) -> None:
     if begin < 1 or (end is not None and end < 1) or (end is not None and end < begin):
-        await my_functions.send_by_channel(interaction.channel, "Number is incorrect!")
+        await my_functions.reply(interaction, "Number is incorrect!", private=True)
         return
 
     if end is None:
@@ -293,9 +293,7 @@ async def cmd_shuffle(interaction: discord.Interaction) -> None:
         return
     track_queue: TrackQueue = player.track_queue
     if await track_queue.shuffle_queue(interaction):
-        await my_functions.send_by_channel(
-            interaction.channel, "The queue is shuffled."
-        )
+        await my_functions.reply(interaction, "The queue is shuffled.")
 
 
 @app_commands.command(
@@ -304,9 +302,7 @@ async def cmd_shuffle(interaction: discord.Interaction) -> None:
 @app_commands.guild_only()
 async def cmd_skip(interaction: discord.Interaction, number: int = 1) -> None:
     if number < 1:
-        await my_functions.send_by_channel(
-            interaction.channel, "Numbers are incorrect!"
-        )
+        await my_functions.reply(interaction, "Numbers are incorrect!", private=True)
         return
 
     await voice_gestion.skip_track(interaction, number)
@@ -331,6 +327,10 @@ settings_group: app_commands.Group = app_commands.Group(
 )
 
 
+def format_delay_setting(seconds: int) -> str:
+    return "kept" if seconds == 0 else f"deleted after {seconds} s"
+
+
 def format_track_setting(value: dict[str, str | None] | None) -> str:
     if not value or not value.get("link"):
         return "None"
@@ -340,11 +340,14 @@ def format_track_setting(value: dict[str, str | None] | None) -> str:
 @settings_group.command(name="show", description="Display the settings.")
 async def cmd_settings_show(interaction: discord.Interaction[MyClient]) -> None:
     settings: dict[str, Any] = interaction.client.load_settings(interaction.guild_id)
-    await my_functions.send_by_interaction(
+    await my_functions.reply(
         interaction,
         f"**Default platform:** {settings['default_platform']}\n"
         f"**Default tracks:** {format_track_setting(settings['default_tracks'])}\n"
-        f"**Welcome track:** {format_track_setting(settings['welcome_track'])}",
+        f"**Welcome track:** {format_track_setting(settings['welcome_track'])}\n"
+        "**Delete replies after:** "
+        f"{format_delay_setting(settings['delete_replies_after'])}",
+        private=True,
     )
 
 
@@ -358,8 +361,8 @@ async def cmd_settings_default_platform(
     interaction.client.update_setting(
         interaction.guild_id, "default_platform", platform.value
     )
-    await my_functions.send_by_interaction(
-        interaction, f"Default platform set to {platform.name}."
+    await my_functions.reply(
+        interaction, f"Default platform set to {platform.name}.", private=True
     )
 
 
@@ -379,13 +382,14 @@ async def cmd_settings_default_tracks(
         "default_tracks",
         {"link": link, "platform": platform.value if platform else None},
     )
-    await my_functions.send_by_interaction(
+    await my_functions.reply(
         interaction,
         (
             "Default tracks removed."
             if link is None
             else f"Default tracks set to `{link}`."
         ),
+        private=True,
     )
 
 
@@ -404,7 +408,7 @@ async def cmd_settings_welcome_track(
         interaction.client.update_setting(
             interaction.guild_id, "welcome_track", {"link": None, "platform": None}
         )
-        await my_functions.send_by_interaction(interaction, "Welcome track disabled.")
+        await my_functions.reply(interaction, "Welcome track disabled.", private=True)
         return
 
     platform_value: str = (
@@ -418,8 +422,8 @@ async def cmd_settings_welcome_track(
         await music_source.get_track(link, interaction.user) if music_source else None
     )
     if track is None:
-        await my_functions.send_by_interaction(
-            interaction, f"Can't find a single track for `{link}`."
+        await my_functions.reply(
+            interaction, f"Can't find a single track for `{link}`.", private=True
         )
         return
 
@@ -428,6 +432,26 @@ async def cmd_settings_welcome_track(
         "welcome_track",
         {"link": link, "platform": platform_value},
     )
-    await my_functions.send_by_interaction(
-        interaction, f'Welcome track set to "{track}" (from the next connection).'
+    await my_functions.reply(
+        interaction,
+        f'Welcome track set to "{track}" (from the next connection).',
+        private=True,
+    )
+
+
+@settings_group.command(
+    name="delete_replies_after",
+    description="Seconds before answers to commands are deleted (0 to keep them).",
+)
+async def cmd_settings_delete_replies_after(
+    interaction: discord.Interaction[MyClient],
+    seconds: app_commands.Range[int, 0, MAX_DELETE_REPLIES_AFTER],
+) -> None:
+    interaction.client.update_setting(
+        interaction.guild_id, "delete_replies_after", seconds
+    )
+    await my_functions.reply(
+        interaction,
+        f"Answers to commands: {format_delay_setting(seconds)}.",
+        private=True,
     )

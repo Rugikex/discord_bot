@@ -11,6 +11,7 @@ from classes.my_command_tree import MyCommandTree
 from classes.guild_player import GuildPlayer
 from constants import BASE_DIR, DEFAULT_SETTINGS
 from logger_setup import my_logger
+import my_functions
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -19,10 +20,12 @@ if TYPE_CHECKING:
         AllowedMentions,
         Guild,
         Intents,
+        Interaction,
         Member,
         VoiceClient,
         VoiceState,
     )
+    from discord.app_commands import Command, ContextMenu
 
 SETTINGS_FOLDER: Path = BASE_DIR / "guild_settings"
 BLACKLIST_FILE: Path = BASE_DIR / "blacklist.txt"
@@ -42,6 +45,11 @@ class MyClient(Client):
     async def setup_hook(self) -> None:
         # Called once at login, unlike on_ready which fires on every reconnection
         await self.tree.sync()
+
+    async def on_app_command_completion(
+        self, interaction: Interaction, command: Command | ContextMenu
+    ) -> None:
+        await my_functions.finish_interaction(interaction)
 
     async def on_ready(self) -> None:
         self.init_guild_settings([guild.id for guild in self.guilds])

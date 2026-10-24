@@ -164,9 +164,7 @@ class YoutubeSource(MusicSource):
         if len(tracks) == 0 and YOUTUBE_VIDEO_WITH_LIST_REGEX.search(query) is not None:
             match: re.Match[str] | None = YOUTUBE_VIDEO_WITH_LIST_REGEX.match(query)
 
-            await my_functions.send_by_channel(
-                interaction.channel, "No playlist found, loading track..."
-            )
+            await my_functions.reply(interaction, "No playlist found, loading track...")
             if match:
                 video_id: str = match[4] if match[4] is not None else match[7]
                 tracks = await self._single_link(
@@ -174,8 +172,8 @@ class YoutubeSource(MusicSource):
                 )
 
         if len(tracks) == 0:
-            await my_functions.send_by_channel(
-                interaction.channel, f'No audio found for "{query}".'
+            await my_functions.reply(
+                interaction, f'No audio found for "{query}".', private=True
             )
             return []
 
