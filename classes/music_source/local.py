@@ -17,7 +17,7 @@ import my_functions
 
 if TYPE_CHECKING:
     from classes.my_client import MyClient
-    from classes.server import Server
+    from classes.guild_player import GuildPlayer
     from collections.abc import Awaitable, Callable
     import discord
 
@@ -91,10 +91,10 @@ class LocalSource(MusicSource):
         create_button_select: Callable[[int, str], Awaitable[discord.ui.Button]],
     ) -> list[Track]:
         files: list[Path] = list_local_files()
-        server: Server = interaction.client.get_server(interaction.guild_id)
+        player: GuildPlayer = interaction.client.get_player(interaction.guild_id)
 
-        if server.search_results is not None:
-            await my_functions.delete_msg(server.search_results.message)
+        if player.search_results is not None:
+            await my_functions.delete_msg(player.search_results.message)
 
         message = await my_functions.send_by_channel(
             interaction.channel,
@@ -130,7 +130,7 @@ class LocalSource(MusicSource):
         search_results: SearchResults = SearchResults(
             searches, shuffle, interaction.user, message, position
         )
-        server.search_results = search_results
+        player.search_results = search_results
 
         msg_content: str = "Select a track with buttons.\n\n"
         for i, track in enumerate(searches):

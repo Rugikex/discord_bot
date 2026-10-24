@@ -15,15 +15,17 @@ if TYPE_CHECKING:
     from classes.track import Track
 
 
-class Server:
+class GuildPlayer:
+    """Playback state of a guild, only while the bot is in a voice channel."""
+
     def __init__(
         self,
-        server_id: int,
+        guild_id: int,
         default_platform: str,
         default_tracks: dict[str, str | None],
         welcome_track: dict[str, str | None] | None = None,
     ) -> None:
-        self._server_id: int = server_id
+        self._guild_id: int = guild_id
         self._default_platform: str = default_platform
         self._default_tracks: dict[str, str | None] = default_tracks
         # Played once, before the first track of the connection
@@ -38,8 +40,8 @@ class Server:
         self._loop_requester: str | None = None
 
     @property
-    def server_id(self) -> int:
-        return self._server_id
+    def guild_id(self) -> int:
+        return self._guild_id
 
     @property
     def default_platform(self) -> str:

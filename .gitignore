@@ -1,5 +1,5 @@
 .idea
 __pycache__
 music/
-server_settings/
+guild_settings/
 .env

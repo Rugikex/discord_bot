@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from classes.current_track import CurrentTrack
     from classes.music_source import MusicSource
     from classes.my_client import MyClient
-    from classes.server import Server
+    from classes.guild_player import GuildPlayer
     from classes.track import Track
     from classes.track_queue import TrackQueue
 
@@ -60,26 +60,26 @@ async def msg_help(interaction: discord.Interaction) -> None:
     await my_functions.send_by_channel(interaction.channel, content)
 
 
-async def get_connected_server(
+async def get_connected_player(
     interaction: discord.Interaction[MyClient],
-) -> Server | None:
-    server: Server | None = interaction.client.find_server(interaction.guild_id)
-    if server is None:
+) -> GuildPlayer | None:
+    player: GuildPlayer | None = interaction.client.find_player(interaction.guild_id)
+    if player is None:
         await my_functions.send_by_channel(
             interaction.channel, "I'm not connected to this server."
         )
-    return server
+    return player
 
 
 async def display_current_track(interaction: discord.Interaction) -> None:
-    server: Server | None = await get_connected_server(interaction)
-    if server is None:
+    player: GuildPlayer | None = await get_connected_player(interaction)
+    if player is None:
         return
-    if server.current_track is None:
+    if player.current_track is None:
         await my_functions.send_by_channel(interaction.channel, "No track.")
         return
 
-    current_track: CurrentTrack = server.current_track
+    current_track: CurrentTrack = player.current_track
     msg_content: str = (
         f"Playing {current_track.track.title}\n[Time] ["
         f"{current_track.audio.progress_str}"
@@ -105,10 +105,10 @@ async def cmd_add_local_tracks(
 @app_commands.command(name="clear", description="Clear the queue.")
 @app_commands.guild_only()
 async def cmd_clear(interaction: discord.Interaction) -> None:
-    server: Server | None = await get_connected_server(interaction)
-    if server is None:
+    player: GuildPlayer | None = await get_connected_player(interaction)
+    if player is None:
         return
-    track_queue: TrackQueue = server.track_queue
+    track_queue: TrackQueue = player.track_queue
     if await track_queue.clear_queue(interaction):
         await my_functions.send_by_channel(interaction.channel, "The queue is cleared.")
 
@@ -128,30 +128,30 @@ async def cmd_help(interaction: discord.Interaction) -> None:
 @app_commands.command(name="loop", description="Loop or unloop the current track.")
 @app_commands.guild_only()
 async def cmd_loop(interaction: discord.Interaction) -> None:
-    server: Server | None = await get_connected_server(interaction)
-    if server is None:
+    player: GuildPlayer | None = await get_connected_player(interaction)
+    if player is None:
         return
-    server.switch_looping(interaction.user.mention)
+    player.switch_looping(interaction.user.mention)
     await my_functions.send_by_channel(
         interaction.channel,
-        f"Looping is {'enabled' if server.is_looping else 'disabled'}.",
+        f"Looping is {'enabled' if player.is_looping else 'disabled'}.",
     )
 
-    if server.current_track is not None:
-        track: Track = server.current_track.track
+    if player.current_track is not None:
+        track: Track = player.current_track.track
         embed, _ = MUSIC_SOURCES[track.origin].create_embed(
-            track, server.loop_requester
+            track, player.loop_requester
         )
-        if server.current_track.message is not None:
+        if player.current_track.message is not None:
             await my_functions.edit_message(
-                server.current_track.message, "", embed=embed
+                player.current_track.message, "", embed=embed
             )
         else:
             message = await my_functions.send_by_channel(
                 interaction.channel, "", permanent=True, embed=embed
             )
-            server.current_track.update(
-                server.current_track.track, message, server.current_track.audio
+            player.current_track.update(
+                player.current_track.track, message, player.current_track.audio
             )
 
 
@@ -162,10 +162,10 @@ async def cmd_loop(interaction: discord.Interaction) -> None:
 async def cmd_move(
     interaction: discord.Interaction, position: int, new_position: int
 ) -> None:
-    server: Server | None = await get_connected_server(interaction)
-    if server is None:
+    player: GuildPlayer | None = await get_connected_player(interaction)
+    if player is None:
         return
-    track_queue: TrackQueue = server.track_queue
+    track_queue: TrackQueue = player.track_queue
     await track_queue.move_track(interaction, position, new_position)
 
 
@@ -250,10 +250,10 @@ async def cmd_play_shuffle(
 @app_commands.command(name="queue", description="Display the queue.")
 @app_commands.guild_only()
 async def cmd_queue(interaction: discord.Interaction, page: int = 1) -> None:
-    server: Server | None = await get_connected_server(interaction)
-    if server is None:
+    player: GuildPlayer | None = await get_connected_player(interaction)
+    if player is None:
         return
-    track_queue: TrackQueue = server.track_queue
+    track_queue: TrackQueue = player.track_queue
     await track_queue.get_queue(interaction, page)
 
 
@@ -271,10 +271,10 @@ async def cmd_remove(
     if end is None:
         end = begin
 
-    server: Server | None = await get_connected_server(interaction)
-    if server is None:
+    player: GuildPlayer | None = await get_connected_player(interaction)
+    if player is None:
         return
-    track_queue: TrackQueue = server.track_queue
+    track_queue: TrackQueue = player.track_queue
 
     await track_queue.remove_tracks(interaction, begin, end)
 
@@ -288,10 +288,10 @@ async def cmd_resume(interaction: discord.Interaction) -> None:
 @app_commands.command(name="shuffle", description="Shuffle tracks.")
 @app_commands.guild_only()
 async def cmd_shuffle(interaction: discord.Interaction) -> None:
-    server: Server | None = await get_connected_server(interaction)
-    if server is None:
+    player: GuildPlayer | None = await get_connected_player(interaction)
+    if player is None:
         return
-    track_queue: TrackQueue = server.track_queue
+    track_queue: TrackQueue = player.track_queue
     if await track_queue.shuffle_queue(interaction):
         await my_functions.send_by_channel(
             interaction.channel, "The queue is shuffled."
@@ -315,10 +315,10 @@ async def cmd_skip(interaction: discord.Interaction, number: int = 1) -> None:
 @app_commands.command(name="stop", description="Stop track.")
 @app_commands.guild_only()
 async def cmd_stop(interaction: discord.Interaction) -> None:
-    server: Server | None = await get_connected_server(interaction)
-    if server is None:
+    player: GuildPlayer | None = await get_connected_player(interaction)
+    if player is None:
         return
-    track_queue: TrackQueue = server.track_queue
+    track_queue: TrackQueue = player.track_queue
     await track_queue.stop_track(interaction)
 
 

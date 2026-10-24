@@ -17,7 +17,7 @@ import my_functions
 
 if TYPE_CHECKING:
     from classes.my_client import MyClient
-    from classes.server import Server
+    from classes.guild_player import GuildPlayer
     from collections.abc import Awaitable, Callable
 
     import discord
@@ -120,14 +120,14 @@ class YoutubeSource(MusicSource):
         create_button_select: Callable[[int, str], Awaitable[discord.ui.Button]],
     ) -> list[Track]:
         message: discord.Message | None
-        server: Server = interaction.client.get_server(interaction.guild_id)
+        player: GuildPlayer = interaction.client.get_player(interaction.guild_id)
         tracks: list[Track] = []
 
         if YOUTUBE_PLAYLIST_REGEX.search(query) is not None:
             message = await my_functions.send_by_channel(
                 interaction.channel, "Loading playlist...", permanent=True
             )
-            server.loading_playlist_message = message
+            player.loading_playlist_message = message
             tracks = await self._playlist_link(query, interaction)
         elif YOUTUBE_VIDEO_REGEX.search(query) is not None:
             message = await my_functions.send_by_channel(
@@ -136,8 +136,8 @@ class YoutubeSource(MusicSource):
             tracks = await self._single_link(query, interaction.user)
             await my_functions.delete_msg(message)
         else:
-            if server.search_results is not None:
-                await my_functions.delete_msg(server.search_results.message)
+            if player.search_results is not None:
+                await my_functions.delete_msg(player.search_results.message)
 
             message = await my_functions.send_by_channel(
                 interaction.channel,
@@ -156,7 +156,7 @@ class YoutubeSource(MusicSource):
             search_results: SearchResults = SearchResults(
                 searches, shuffle, interaction.user, message, position
             )
-            server.search_results = search_results
+            player.search_results = search_results
 
             msg_content: str = "Select a track with buttons.\n\n"
             for i, track in enumerate(searches):
@@ -243,14 +243,14 @@ class YoutubeSource(MusicSource):
     ) -> list[Track]:
         normalized_url: str = self._normalize_youtube_url(playlist_url)
 
-        server: Server = interaction.client.get_server(interaction.guild_id)
+        player: GuildPlayer = interaction.client.get_player(interaction.guild_id)
 
         info: dict[str, Any] | None = await asyncio.to_thread(
             _extract_flat, normalized_url
         )
         tracks: list[Track] = _entries_to_tracks(info, interaction.user)
 
-        await my_functions.delete_msg(server.loading_playlist_message)
-        server.loading_playlist_message = None
+        await my_functions.delete_msg(player.loading_playlist_message)
+        player.loading_playlist_message = None
 
         return tracks

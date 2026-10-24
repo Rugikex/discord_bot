@@ -14,7 +14,7 @@ import voice_gestion
 if TYPE_CHECKING:
     from classes.current_track import CurrentTrack
     from classes.my_client import MyClient
-    from classes.server import Server
+    from classes.guild_player import GuildPlayer
 
 
 class TrackQueue:
@@ -211,11 +211,11 @@ class TrackQueue:
         self, interaction: discord.Interaction[MyClient], page: int
     ) -> str:
         max_page: int = max(math.ceil(len(self._tracks) / 10), 1)
-        server: Server = interaction.client.get_server(interaction.guild_id)
-        number_tracks: int = 0 if server.current_track is None else 1
+        player: GuildPlayer = interaction.client.get_player(interaction.guild_id)
+        number_tracks: int = 0 if player.current_track is None else 1
         msg_content: str = f"Queue list (page {page}/{max_page}):\n"
-        if page == 1 and server.current_track is not None:
-            current_track: CurrentTrack = server.current_track
+        if page == 1 and player.current_track is not None:
+            current_track: CurrentTrack = player.current_track
             msg_content += f"**Now.** {current_track.track.title} ["
             msg_content += current_track.audio.progress_str
 
@@ -229,7 +229,7 @@ class TrackQueue:
 
         msg_content += (
             f"__Total tracks:__ {number_tracks}\n"
-            f"__Total time:__ {self.get_queue_total_time(server.current_track)}"
+            f"__Total time:__ {self.get_queue_total_time(player.current_track)}"
         )
         return msg_content
 
@@ -281,9 +281,11 @@ class TrackQueue:
             return
 
         self._tracks: list[Track] = []
-        server: Server | None = interaction.client.find_server(interaction.guild_id)
-        if server is not None:
-            server.stop_looping()
+        player: GuildPlayer | None = interaction.client.find_player(
+            interaction.guild_id
+        )
+        if player is not None:
+            player.stop_looping()
 
         voice_client.stop()
         await my_functions.send_by_channel(

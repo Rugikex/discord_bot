@@ -18,7 +18,7 @@ import my_functions
 if TYPE_CHECKING:
     from classes.music_source import MusicSource
     from classes.my_client import MyClient
-    from classes.server import Server
+    from classes.guild_player import GuildPlayer
     from classes.track_queue import TrackQueue
 
 
@@ -51,15 +51,15 @@ def _after_track(
 
 
 async def get_welcome_track(
-    server: Server, requester: discord.User | discord.Member
+    player: GuildPlayer, requester: discord.User | discord.Member
 ) -> Track | None:
-    """Build the welcome track from the server settings, only once per connection."""
-    settings: dict[str, str | None] | None = server.pop_welcome_track()
+    """Build the welcome track from the guild settings, only once per connection."""
+    settings: dict[str, str | None] | None = player.pop_welcome_track()
     if not settings or not settings.get("link"):
         return None
 
     music_source: MusicSource | None = MUSIC_SOURCES.get(
-        settings.get("platform") or server.default_platform
+        settings.get("platform") or player.default_platform
     )
     if music_source is None:
         return None
@@ -68,34 +68,34 @@ async def get_welcome_track(
 
 async def next_track(interaction: discord.Interaction[MyClient], guild_id: int) -> None:
     """Play the next track if nothing is playing (or paused)."""
-    server: Server | None = interaction.client.find_server(guild_id)
-    if server is None:
+    player: GuildPlayer | None = interaction.client.find_player(guild_id)
+    if player is None:
         return
 
-    async with server.play_lock:
+    async with player.play_lock:
         while True:
             voice_client: discord.VoiceClient | None = (
                 interaction.guild.voice_client if interaction.guild else None
             )
-            if voice_client is None or server.is_disconnected:
+            if voice_client is None or player.is_disconnected:
                 return
             if voice_client.is_playing() or voice_client.is_paused():
                 return  # Already started by another command
 
-            track_queue: TrackQueue = server.track_queue
+            track_queue: TrackQueue = player.track_queue
             new_track: Track
             welcome_track: Track | None = await get_welcome_track(
-                server, interaction.user
+                player, interaction.user
             )
-            is_replay: bool = server.is_looping and server.current_track is not None
+            is_replay: bool = player.is_looping and player.current_track is not None
             if welcome_track is not None:
                 new_track = welcome_track
             elif is_replay:
-                new_track = server.current_track.track
+                new_track = player.current_track.track
             elif track_queue.has_next_track():
                 new_track = track_queue.next_track
             else:
-                await server.clear_current_and_queue_messages()
+                await player.clear_current_and_queue_messages()
                 return
 
             url: str | None
@@ -106,7 +106,7 @@ async def next_track(interaction: discord.Interaction[MyClient], guild_id: int) 
 
             if url is None:
                 if is_replay:
-                    server.stop_looping()  # Avoid retrying the same track forever
+                    player.stop_looping()  # Avoid retrying the same track forever
                 await my_functions.send_by_channel(
                     interaction.channel,
                     f'Can\'t find stream for listening "{new_track}".\n'
@@ -114,14 +114,14 @@ async def next_track(interaction: discord.Interaction[MyClient], guild_id: int) 
                 )
                 continue
 
-            if not voice_client.is_connected() or server.is_disconnected:
+            if not voice_client.is_connected() or player.is_disconnected:
                 return
 
             audio: AudioSourceTracked = AudioSourceTracked(
                 discord.FFmpegPCMAudio(url, **ffmpeg_options)
             )
 
-            await server.update_current_track(interaction, new_track, audio)
+            await player.update_current_track(interaction, new_track, audio)
 
             voice_client.play(
                 audio,
@@ -211,12 +211,12 @@ async def skip_track(interaction: discord.Interaction[MyClient], number: int) ->
 
     real_number: int = number - 1  # Because the first track is the current track
 
-    server: Server = interaction.client.get_server(interaction.guild_id)
-    track_queue: TrackQueue = server.track_queue
+    player: GuildPlayer = interaction.client.get_player(interaction.guild_id)
+    track_queue: TrackQueue = player.track_queue
 
     track_to_skip: Track | None
-    if server.current_track is not None:
-        track_to_skip = server.current_track.track
+    if player.current_track is not None:
+        track_to_skip = player.current_track.track
     else:
         track_to_skip = None
 
@@ -225,7 +225,7 @@ async def skip_track(interaction: discord.Interaction[MyClient], number: int) ->
     )  # 1 because the pop(begin - 1)
 
     # Otherwise next_track replays the current track
-    server.stop_looping()
+    player.stop_looping()
     voice_client.stop()
 
     if track_to_skip:
@@ -248,8 +248,8 @@ async def is_connected(
 ) -> bool:
     current_voice_client: discord.VoiceClient | None = interaction.guild.voice_client
     if current_voice_client is not None and current_voice_client.channel == channel:
-        if not interaction.client.server_exists(interaction.guild_id):
-            interaction.client.add_server(interaction.guild_id)
+        if not interaction.client.player_exists(interaction.guild_id):
+            interaction.client.add_player(interaction.guild_id)
         return True
     try:
         await channel.connect(timeout=15.0, self_deaf=True)
@@ -270,7 +270,7 @@ async def is_connected(
         )
         return False
 
-    interaction.client.add_server(interaction.guild_id)
+    interaction.client.add_player(interaction.guild_id)
     my_logger.info("Bot connects to %s.", interaction.guild.name)
     return True
 
@@ -278,11 +278,11 @@ async def is_connected(
 async def select_specific_search(
     interaction: discord.Interaction[MyClient], number: int, content: str
 ) -> None:
-    server: Server | None = interaction.client.find_server(interaction.guild_id)
-    if server is None:
+    player: GuildPlayer | None = interaction.client.find_player(interaction.guild_id)
+    if player is None:
         return
 
-    search_results: SearchResults | None = server.search_results
+    search_results: SearchResults | None = player.search_results
     if search_results is None:
         return
 
@@ -291,7 +291,7 @@ async def select_specific_search(
         return
 
     # Only one selection per search
-    server.search_results = None
+    player.search_results = None
 
     track: Track = search_results.get_track(number)
     shuffle: bool = search_results.shuffle
@@ -299,7 +299,7 @@ async def select_specific_search(
 
     await search_results.delete_message()
 
-    track_queue: TrackQueue = server.track_queue
+    track_queue: TrackQueue = player.track_queue
 
     shuffle_queue: bool = shuffle and not position
 
@@ -342,12 +342,12 @@ async def play(
         )
         return
 
-    server: Server = interaction.client.get_server(interaction.guild_id)
-    track_queue: TrackQueue = server.track_queue
+    player: GuildPlayer = interaction.client.get_player(interaction.guild_id)
+    track_queue: TrackQueue = player.track_queue
 
     platform: str
     if raw_platform is None:
-        platform = server.default_platform
+        platform = player.default_platform
     elif isinstance(raw_platform, str):
         platform = raw_platform
     else:
@@ -400,8 +400,8 @@ async def play_local(
         )
         return
 
-    server: Server = interaction.client.get_server(interaction.guild_id)
-    track_queue: TrackQueue = server.track_queue
+    player: GuildPlayer = interaction.client.get_player(interaction.guild_id)
+    track_queue: TrackQueue = player.track_queue
 
     if position and (position < 1 or position > track_queue.queue_size):
         position = None

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from discord import Client, utils
 
 from classes.my_command_tree import MyCommandTree
-from classes.server import Server
+from classes.guild_player import GuildPlayer
 from constants import BASE_DIR, DEFAULT_SETTINGS
 from logger_setup import my_logger
 
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
         VoiceState,
     )
 
-SETTINGS_FOLDER: Path = BASE_DIR / "server_settings"
+SETTINGS_FOLDER: Path = BASE_DIR / "guild_settings"
 BLACKLIST_FILE: Path = BASE_DIR / "blacklist.txt"
 
 
@@ -34,7 +34,8 @@ class MyClient(Client):
     ) -> None:
         super().__init__(intents=intents, allowed_mentions=allowed_mentions)
         self.tree: MyCommandTree = MyCommandTree(self)
-        self._servers: dict[int, Server] = {}
+        # Only the guilds where the bot is connected to a voice channel
+        self._players: dict[int, GuildPlayer] = {}
         self._blacklist: set[int] = self._get_blacklist()
         self._background_tasks: set[asyncio.Task[None]] = set()
 
@@ -43,7 +44,7 @@ class MyClient(Client):
         await self.tree.sync()
 
     async def on_ready(self) -> None:
-        self.init_server_settings([guild.id for guild in self.guilds])
+        self.init_guild_settings([guild.id for guild in self.guilds])
 
         my_logger.info(
             "Logged in as %s to %s.", self.user, [guild.name for guild in self.guilds]
@@ -55,7 +56,7 @@ class MyClient(Client):
         """Disconnect the bot if alone in a voice channel or if kicked."""
         guild_id: int = member.guild.id
         # Mute, deafen, stream... or the bot is not playing in this server
-        if before.channel == after.channel or not self.server_exists(guild_id):
+        if before.channel == after.channel or not self.player_exists(guild_id):
             return
 
         # Already None if discord.py has handled a kick before this event
@@ -91,17 +92,17 @@ class MyClient(Client):
         if guild_id is None:
             return
 
-        server: Server | None = self.find_server(guild_id)
-        if server is None:
+        player: GuildPlayer | None = self.find_player(guild_id)
+        if player is None:
             if voice_client is not None:
                 await voice_client.disconnect()
             return
-        if server.is_disconnected:
+        if player.is_disconnected:
             return
 
-        self.remove_server(guild_id)
-        server.disconnect()
-        await server.track_queue.clear_queue(None)
+        self.remove_player(guild_id)
+        player.disconnect()
+        await player.track_queue.clear_queue(None)
 
         if voice_client is not None:
             voice_client.stop()
@@ -109,7 +110,7 @@ class MyClient(Client):
             await voice_client.disconnect()
 
         # Always delete the messages ("Playing", queue...), even after a kick
-        await server.clear()
+        await player.clear()
 
         guild: Guild | None = self.get_guild(guild_id)
         my_logger.info("Bot disconnects to %s.", guild.name if guild else guild_id)
@@ -131,39 +132,39 @@ class MyClient(Client):
 
         return result
 
-    def init_server_settings(self, server_ids: list[int]) -> None:
-        """Create or complete the settings file of each server.
+    def init_guild_settings(self, guild_ids: list[int]) -> None:
+        """Create or complete the settings file of each guild.
 
-        Files of servers the bot has left are kept, in case it is invited again.
+        Files of guilds the bot has left are kept, in case it is invited again.
         """
-        for server_id in server_ids:
-            settings: dict[str, Any] = self.load_settings(server_id)
-            if self._read_settings_file(server_id) != settings:
-                self.save_settings(server_id, settings)
+        for guild_id in guild_ids:
+            settings: dict[str, Any] = self.load_settings(guild_id)
+            if self._read_settings_file(guild_id) != settings:
+                self.save_settings(guild_id, settings)
 
-    def server_exists(self, server_id: int) -> bool:
-        return server_id in self._servers
+    def player_exists(self, guild_id: int) -> bool:
+        return guild_id in self._players
 
-    def find_server(self, server_id: int | None) -> Server | None:
-        if server_id is None:
+    def find_player(self, guild_id: int | None) -> GuildPlayer | None:
+        if guild_id is None:
             return None
-        return self._servers.get(server_id)
+        return self._players.get(guild_id)
 
-    def get_server(self, server_id: int | None) -> Server:
-        if server_id is None:
-            raise ValueError("Server ID must not be None")
+    def get_player(self, guild_id: int | None) -> GuildPlayer:
+        if guild_id is None:
+            raise ValueError("Guild ID must not be None")
 
-        server: Server | None = self._servers.get(server_id)
-        if server is None:
-            raise KeyError("Server not found")
-        return server
+        player: GuildPlayer | None = self._players.get(guild_id)
+        if player is None:
+            raise KeyError("Guild player not found")
+        return player
 
     @staticmethod
-    def _settings_path(server_id: int) -> Path:
-        return SETTINGS_FOLDER / f"{server_id}.json"
+    def _settings_path(guild_id: int) -> Path:
+        return SETTINGS_FOLDER / f"{guild_id}.json"
 
-    def _read_settings_file(self, server_id: int) -> dict[str, Any]:
-        file_path: Path = self._settings_path(server_id)
+    def _read_settings_file(self, guild_id: int) -> dict[str, Any]:
+        file_path: Path = self._settings_path(guild_id)
         if not file_path.exists():
             return {}
         try:
@@ -172,45 +173,45 @@ class MyClient(Client):
             return {}
         return settings if isinstance(settings, dict) else {}
 
-    def load_settings(self, server_id: int) -> dict[str, Any]:
-        """Settings of the server, completed with the default values."""
-        settings: dict[str, Any] = self._read_settings_file(server_id)
+    def load_settings(self, guild_id: int) -> dict[str, Any]:
+        """Settings of the guild, completed with the default values."""
+        settings: dict[str, Any] = self._read_settings_file(guild_id)
         return {
             key: settings.get(key, copy.deepcopy(value))
             for key, value in DEFAULT_SETTINGS.items()
         }
 
-    def save_settings(self, server_id: int, settings: dict[str, Any]) -> None:
+    def save_settings(self, guild_id: int, settings: dict[str, Any]) -> None:
         SETTINGS_FOLDER.mkdir(exist_ok=True)
-        self._settings_path(server_id).write_text(
+        self._settings_path(guild_id).write_text(
             json.dumps(settings, indent=4, ensure_ascii=False), encoding="utf-8"
         )
 
-    def update_setting(self, server_id: int, key: str, value: Any) -> None:
-        settings: dict[str, Any] = self.load_settings(server_id)
+    def update_setting(self, guild_id: int, key: str, value: Any) -> None:
+        settings: dict[str, Any] = self.load_settings(guild_id)
         settings[key] = value
-        self.save_settings(server_id, settings)
+        self.save_settings(guild_id, settings)
 
-        # A connected server keeps its default platform in memory
-        server: Server | None = self.find_server(server_id)
-        if server is not None and key == "default_platform":
-            server.default_platform = value
+        # A connected player keeps its default platform in memory
+        player: GuildPlayer | None = self.find_player(guild_id)
+        if player is not None and key == "default_platform":
+            player.default_platform = value
 
-    def add_server(self, server_id: int | None) -> None:
-        if server_id is None:
-            raise ValueError("Server ID must not be None")
+    def add_player(self, guild_id: int | None) -> None:
+        if guild_id is None:
+            raise ValueError("Guild ID must not be None")
 
-        settings: dict[str, Any] = self.load_settings(server_id)
-        server: Server = Server(
-            server_id,
+        settings: dict[str, Any] = self.load_settings(guild_id)
+        player: GuildPlayer = GuildPlayer(
+            guild_id,
             settings["default_platform"],
             settings["default_tracks"],
             settings["welcome_track"],
         )
-        self._servers[server_id] = server
+        self._players[guild_id] = player
 
-    def remove_server(self, server_id: int) -> None:
-        self._servers.pop(server_id, None)
+    def remove_player(self, guild_id: int) -> None:
+        self._players.pop(guild_id, None)
 
     @property
     def blacklist(self) -> set[int]:
