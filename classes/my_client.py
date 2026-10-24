@@ -13,7 +13,16 @@ from constants import BASE_DIR, DEFAULT_SETTINGS
 from logger_setup import my_logger
 
 if TYPE_CHECKING:
-    from discord import AllowedMentions, Intents, Member, VoiceClient, VoiceState
+    from collections.abc import Coroutine
+
+    from discord import (
+        AllowedMentions,
+        Guild,
+        Intents,
+        Member,
+        VoiceClient,
+        VoiceState,
+    )
 
 SETTINGS_FOLDER: Path = BASE_DIR / "server_settings"
 BLACKLIST_FILE: Path = BASE_DIR / "blacklist.txt"
@@ -27,6 +36,7 @@ class MyClient(Client):
         self.tree: MyCommandTree = MyCommandTree(self)
         self._servers: dict[int, Server] = {}
         self._blacklist: set[int] = self._get_blacklist()
+        self._background_tasks: set[asyncio.Task[None]] = set()
 
     async def setup_hook(self) -> None:
         # Called once at login, unlike on_ready which fires on every reconnection
@@ -43,53 +53,48 @@ class MyClient(Client):
         self, member: Member, before: VoiceState, after: VoiceState
     ) -> None:
         """Disconnect the bot if alone in a voice channel or if kicked."""
+        guild_id: int = member.guild.id
+        # Mute, deafen, stream... or the bot is not playing in this server
+        if before.channel == after.channel or not self.server_exists(guild_id):
+            return
+
+        # Already None if discord.py has handled a kick before this event
         voice_client: VoiceClient | None = utils.get(
             self.voice_clients, guild=member.guild
         )
-        if voice_client is None or before.channel is None:
+
+        if member == self.user:
+            if after.channel is None or len(after.channel.members) == 1:
+                # Kicked, disconnected by hand or moved to an empty channel
+                self._run_in_background(self.disconnect_bot(voice_client, guild_id))
+            elif voice_client is not None:
+                voice_client.resume()  # The audio is paused during the move
             return
 
-        if not self.server_exists(member.guild.id):
-            return
-
+        # Another member left the bot's channel
         if (
-            member != self.user
-            and self.user in before.channel.members
+            voice_client is not None
+            and before.channel == voice_client.channel
             and len(before.channel.members) == 1
         ):
-            self.loop.create_task(self.disconnect_bot(voice_client, member.guild.id))
-            return
+            self._run_in_background(self.disconnect_bot(voice_client, guild_id))
 
-        if (
-            member == self.user
-            and after.channel
-            and before.channel is not after.channel
-        ):
-            if len(after.channel.members) == 1:
-                self.loop.create_task(
-                    self.disconnect_bot(voice_client, member.guild.id)
-                )
-            else:
-                voice_client.resume()
-            return
-
-        if (
-            member == self.user
-            and not after.channel
-            and len(before.channel.members) != 0
-        ):
-            self.loop.create_task(self.disconnect_bot(voice_client, member.guild.id))
-            return
+    def _run_in_background(self, coro: Coroutine[Any, Any, None]) -> None:
+        # asyncio only keeps a weak reference to tasks: keep one until they end
+        task: asyncio.Task[None] = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
     async def disconnect_bot(
-        self, voice_client: VoiceClient, guild_id: int | None
+        self, voice_client: VoiceClient | None, guild_id: int | None
     ) -> None:
         if guild_id is None:
             return
 
         server: Server | None = self.find_server(guild_id)
         if server is None:
-            await voice_client.disconnect()
+            if voice_client is not None:
+                await voice_client.disconnect()
             return
         if server.is_disconnected:
             return
@@ -98,13 +103,16 @@ class MyClient(Client):
         server.disconnect()
         await server.track_queue.clear_queue(None)
 
-        voice_client.stop()
-        await asyncio.sleep(1.0)  # Wait for the track to stop
+        if voice_client is not None:
+            voice_client.stop()
+            await asyncio.sleep(1.0)  # Wait for the track to stop
+            await voice_client.disconnect()
 
-        await voice_client.disconnect()
+        # Always delete the messages ("Playing", queue...), even after a kick
         await server.clear()
 
-        my_logger.info("Bot disconnects to %s.", voice_client.guild.name)
+        guild: Guild | None = self.get_guild(guild_id)
+        my_logger.info("Bot disconnects to %s.", guild.name if guild else guild_id)
 
     def _get_blacklist(self) -> set[int]:
         if not BLACKLIST_FILE.exists():
