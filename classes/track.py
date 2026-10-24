@@ -29,7 +29,7 @@ class Track:
         return self._title
 
     @property
-    def duration(self) -> timedelta | str:
+    def duration(self) -> timedelta:
         return self._duration
 
     @property

@@ -127,34 +127,12 @@ async def edit_message(
         return await send_by_channel(message.channel, content, view=view, embed=embed)
 
 
-async def edit_response(
-    response: discord.InteractionMessage,
-    content: str = discord.utils.MISSING,
-    view: discord.ui.View = discord.utils.MISSING,
-) -> None:
-    try:
-        await response.edit(content=content, view=view)
-    except discord.errors.HTTPException:
-        pass
-
-
 async def delete_msg(
     message: discord.Message | discord.InteractionMessage | None,
 ) -> None:
-    if message is None or isinstance(message, discord.InteractionResponse):
+    if message is None:
         return
     try:
         await message.delete()
     except (discord.errors.NotFound, discord.errors.HTTPException):
-        pass
-
-
-# Not use
-async def add_reaction(interaction: discord.Interaction, reaction) -> None:
-    try:
-        interaction_message: discord.InteractionMessage = (
-            await interaction.original_response()
-        )
-        await interaction_message.add_reaction(reaction)
-    except discord.errors.NotFound:
         pass

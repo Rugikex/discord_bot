@@ -213,7 +213,6 @@ class MyClient(Client):
         player: GuildPlayer = GuildPlayer(
             guild_id,
             settings["default_platform"],
-            settings["default_tracks"],
             settings["welcome_track"],
         )
         self._players[guild_id] = player

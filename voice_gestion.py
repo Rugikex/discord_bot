@@ -158,7 +158,7 @@ async def get_voice_client(
 async def check_voice_client(
     interaction: discord.Interaction,
 ) -> discord.VoiceClient | None:
-    voice_client: discord.VoiceClient = await get_voice_client(interaction)
+    voice_client: discord.VoiceClient | None = await get_voice_client(interaction)
     if voice_client is None:
         return None
 
@@ -174,7 +174,7 @@ async def client_is_disconnected(interaction: discord.Interaction) -> bool:
 
 
 async def pause_track(interaction: discord.Interaction) -> None:
-    voice_client: discord.VoiceClient = await check_voice_client(interaction)
+    voice_client: discord.VoiceClient | None = await check_voice_client(interaction)
     if voice_client is None:
         return
 
@@ -190,7 +190,7 @@ async def pause_track(interaction: discord.Interaction) -> None:
 
 
 async def resume_track(interaction: discord.Interaction) -> None:
-    voice_client: discord.VoiceClient = await check_voice_client(interaction)
+    voice_client: discord.VoiceClient | None = await check_voice_client(interaction)
     if voice_client is None:
         return
 
@@ -206,7 +206,7 @@ async def resume_track(interaction: discord.Interaction) -> None:
 
 
 async def skip_track(interaction: discord.Interaction[MyClient], number: int) -> None:
-    voice_client: discord.VoiceClient = await check_voice_client(interaction)
+    voice_client: discord.VoiceClient | None = await check_voice_client(interaction)
     if voice_client is None:
         return
 

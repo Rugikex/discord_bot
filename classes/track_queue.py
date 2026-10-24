@@ -95,8 +95,8 @@ class TrackQueue:
         end: int,
         send_msg: bool = True,
     ) -> None:
-        voice_client: discord.VoiceClient = await voice_gestion.check_voice_client(
-            interaction
+        voice_client: discord.VoiceClient | None = (
+            await voice_gestion.check_voice_client(interaction)
         )
         if voice_client is None:
             return
@@ -114,8 +114,8 @@ class TrackQueue:
 
     async def get_queue(
         self, interaction: discord.Interaction, page: int, is_new: bool = True
-    ):
-        voice_client: discord.VoiceClient = await voice_gestion.get_voice_client(
+    ) -> None:
+        voice_client: discord.VoiceClient | None = await voice_gestion.get_voice_client(
             interaction
         )
         if voice_client is None:
@@ -156,10 +156,10 @@ class TrackQueue:
         self,
         interaction: discord.Interaction,
         tracks: list[Track],
-        position: int,
+        position: int | None,
         content: str,
         shuffle: bool,
-    ):
+    ) -> None:
         if position is not None:
             i: int
             track: Track
@@ -195,7 +195,7 @@ class TrackQueue:
             await self.shuffle_queue(interaction)
 
     async def shuffle_queue(self, interaction: discord.Interaction) -> bool:
-        voice_client: discord.VoiceClient = await voice_gestion.get_voice_client(
+        voice_client: discord.VoiceClient | None = await voice_gestion.get_voice_client(
             interaction
         )
         if voice_client is None:
@@ -272,7 +272,7 @@ class TrackQueue:
         await my_functions.edit_message(message, view=view)
 
     async def stop_track(self, interaction: discord.Interaction[MyClient]) -> None:
-        voice_client: discord.VoiceClient = await voice_gestion.get_voice_client(
+        voice_client: discord.VoiceClient | None = await voice_gestion.get_voice_client(
             interaction
         )
         if voice_client is None:

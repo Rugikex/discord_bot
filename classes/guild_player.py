@@ -22,12 +22,10 @@ class GuildPlayer:
         self,
         guild_id: int,
         default_platform: str,
-        default_tracks: dict[str, str | None],
         welcome_track: dict[str, str | None] | None = None,
     ) -> None:
         self._guild_id: int = guild_id
         self._default_platform: str = default_platform
-        self._default_tracks: dict[str, str | None] = default_tracks
         # Played once, before the first track of the connection
         self._welcome_track: dict[str, str | None] | None = welcome_track
         # Prevents two coroutines from starting a track at the same time
@@ -49,10 +47,6 @@ class GuildPlayer:
     @default_platform.setter
     def default_platform(self, value: str) -> None:
         self._default_platform = value
-
-    @property
-    def default_tracks(self) -> dict[str, str | None]:
-        return self._default_tracks
 
     @property
     def current_track(self) -> CurrentTrack | None:

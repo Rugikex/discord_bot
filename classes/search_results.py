@@ -15,24 +15,20 @@ class SearchResults:
         tracks: list[Track],
         query: str,
         shuffle: bool,
-        user: discord.Member,
+        user: discord.User | discord.Member,
         message: discord.Message | None,
         position: int | None,
     ) -> None:
         self._tracks: list[Track] = tracks
         self._query: str = query
         self._shuffle: bool = shuffle
-        self._user: discord.Member = user
-        self._message: discord.Message = message
-        self._position: int = position
+        self._user: discord.User | discord.Member = user
+        self._message: discord.Message | None = message
+        self._position: int | None = position
 
     @property
     def tracks(self) -> list[Track]:
         return self._tracks
-
-    @tracks.setter
-    def tracks(self, value: list[Track]) -> None:
-        self._tracks = value
 
     @property
     def query(self) -> str:
@@ -43,7 +39,7 @@ class SearchResults:
         return self._shuffle
 
     @property
-    def user(self) -> discord.Member:
+    def user(self) -> discord.User | discord.Member:
         return self._user
 
     @property
