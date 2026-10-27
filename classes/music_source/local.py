@@ -68,7 +68,7 @@ def load_local_tracks(
 
 class LocalSource(MusicSource):
     color: Color = Color.from_str("#1F3F68")
-    logo: str = "server-logo.png"
+    logo: str = "local-logo.png"
 
     @override
     def get_url(self, track: Track) -> str | None:
