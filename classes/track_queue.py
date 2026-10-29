@@ -38,9 +38,9 @@ class TrackQueue:
         self, interaction: discord.Interaction[MyClient] | None
     ) -> bool:
         if interaction is not None:
-            voice_client: discord.VoiceClient | None = (
-                await voice_gestion.check_voice_client(interaction)
-            )
+            voice_client: (
+                discord.VoiceClient | None
+            ) = await voice_gestion.check_voice_client(interaction)
             if voice_client is None:
                 return False
 
@@ -101,9 +101,9 @@ class TrackQueue:
         end: int,
         send_msg: bool = True,
     ) -> None:
-        voice_client: discord.VoiceClient | None = (
-            await voice_gestion.check_voice_client(interaction)
-        )
+        voice_client: (
+            discord.VoiceClient | None
+        ) = await voice_gestion.check_voice_client(interaction)
         if voice_client is None:
             return
 
@@ -189,12 +189,12 @@ class TrackQueue:
             if len(tracks) > 1:
                 await my_functions.reply(
                     interaction,
-                    f"Added {len(tracks)} tracks to queue.\n" f'From: "{content}".',
+                    f'Added {len(tracks)} tracks to queue.\nFrom: "{content}".',
                 )
             else:
                 await my_functions.reply(
                     interaction,
-                    f'Added to queue: "{tracks[0]}".\n' f'From: "{content}".',
+                    f'Added to queue: "{tracks[0]}".\nFrom: "{content}".',
                 )
 
         if shuffle:

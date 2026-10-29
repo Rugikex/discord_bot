@@ -332,9 +332,9 @@ async def join_user_channel(
     interaction: discord.Interaction[MyClient],
 ) -> GuildPlayer | None:
     """Connect the bot to the voice channel of the user, None if it can't."""
-    user_channel: discord.VoiceChannel | discord.StageChannel | None = (
-        await get_user_voice_channel(interaction)
-    )
+    user_channel: (
+        discord.VoiceChannel | discord.StageChannel | None
+    ) = await get_user_voice_channel(interaction)
     if user_channel is None:
         return None
 
