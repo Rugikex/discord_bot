@@ -13,6 +13,7 @@ A Discord music bot with slash commands. It plays YouTube videos and playlists, 
 
 - [**uv**](https://docs.astral.sh/uv/getting-started/installation/) (it installs Python 3.12 if needed)
 - **FFmpeg** installed and available in the `PATH` (`ffmpeg -version` must work)
+- [**Deno**](https://docs.deno.com/runtime/getting_started/installation/) installed and available in the `PATH` (`deno --version` must work). yt-dlp needs it to solve YouTube's JavaScript challenges.
 - A Discord application with a bot (see below)
 
 ## Discord setup

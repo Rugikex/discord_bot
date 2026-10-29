@@ -9,7 +9,7 @@ dependencies = [
     "mutagen>=1.48",
     "python-dotenv>=1.2",
     "thefuzz>=0.22",
-    "yt-dlp>=2026.10.21",
+    "yt-dlp[default]>=2026.10.21",
 ]
 
 [dependency-groups]
