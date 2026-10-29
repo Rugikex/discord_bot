@@ -11,7 +11,7 @@ A Discord music bot with slash commands. It plays YouTube videos and playlists, 
 
 ## Requirements
 
-- **Python 3.12** or newer
+- [**uv**](https://docs.astral.sh/uv/getting-started/installation/) (it installs Python 3.12 if needed)
 - **FFmpeg** installed and available in the `PATH` (`ffmpeg -version` must work)
 - A Discord application with a bot (see below)
 
@@ -35,13 +35,7 @@ A Discord music bot with slash commands. It plays YouTube videos and playlists, 
 git clone git@github.com:Rugikex/discord_bot.git
 cd discord_bot
 
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# Linux / macOS
-source .venv/bin/activate
-
-pip install -r requirements.txt
+uv sync
 ```
 
 Create the `.env` file from the template and put your token in it:
@@ -57,7 +51,7 @@ DISCORD_KEY=your_bot_token
 ## Run
 
 ```bash
-python main.py
+uv run main.py
 ```
 
 The slash commands are synchronized at startup. Discord can take a few minutes to display new or changed commands.
